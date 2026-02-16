@@ -25,9 +25,10 @@ export function useSocket() {
     const initSocket = () => {
         if (socket.value) return;
 
-        // Use current hostname to allow mobile devices to connect via IP
-        const backendUrl = `http://${window.location.hostname}:3000`;
-        socket.value = io(backendUrl);
+        // Connect to the same origin (relative path)
+        // In dev, Vite proxy handles forwarding to localhost:3000
+        // In prod, Nginx handles forwarding to localhost:3000
+        socket.value = io();
 
         socket.value.on('connect', () => {
             isConnected.value = true;
