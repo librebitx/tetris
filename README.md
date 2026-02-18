@@ -1,4 +1,4 @@
-# 多人在线俄罗斯方块 (Multiplayer Tetris)
+# 俄罗斯方块据点争夺战
 
 这是一个基于 Web 的实时多人对战俄罗斯方块游戏。支持创建房间、实时对战、聊天互动、历史记录查看等功能。
 
@@ -81,5 +81,4 @@
 
 ## 文档
 
-- **[部署指南 (DEPLOY.md)](DEPLOY.md)**：如何在 Linux 服务器上部署生产环境。
 - **[故障排除 (TROUBLESHOOTING.md)](TROUBLESHOOTING.md)**：常见问题解决方案和日志查看方法。
