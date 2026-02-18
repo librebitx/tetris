@@ -1,53 +1,67 @@
-# 故障排除指南
+# 故障排除指南 (Troubleshooting)
 
-如果网站遇到问题，您可以查看日志来诊断问题。日志的位置取决于您运行游戏的方式。
+如果游戏遇到问题，请通过查看日志进行诊断。
 
-## 1. 本地运行 (通过 `start_game.sh`)
+## 1. 查看日志 (Check Logs)
 
-如果您使用 `./start_game.sh` 脚本启动游戏，日志将被重定向到项目目录中的文件。
-
+### 本地开发 (start_game.sh)
+使用脚本启动时，日志会输出到项目目录：
 - **后端日志**: `tetris-shared/server.log`
 - **前端日志**: `tetris-vue/vue.log`
 
-### 如何查看日志：
-
-您可以使用 `tail` 命令实时查看日志：
-
+**实时查看命令**:
 ```bash
-# 查看后端日志
 tail -f tetris-shared/server.log
-
-# 查看前端日志
+# 或
 tail -f tetris-vue/vue.log
 ```
 
-## 2. 生产环境运行 (通过 PM2)
+### 生产环境 (PM2)
+如果使用 PM2 管理进程：
+```bash
+pm2 logs tetris-backend
+pm2 logs                # 查看所有日志
+```
 
-如果您使用 `pm2` 部署游戏（如 `DEPLOY.md` 中所述），日志由 PM2 管理。
+## 2. 常见问题 (Common Issues)
 
-- **查看所有日志**:
-  ```bash
-  pm2 logs
-  ```
+### A. 历史记录不保存 (History Not Saving)
+如果游戏结束但看不到历史记录：
+1. **检查权限**：确保后端进程有权写入 `tetris-shared/history.json`。
+   ```bash
+   ls -l tetris-shared/history.json
+   # 确保文件所属用户与运行 Node.js 的用户一致
+   ```
+2. **Top Out (方块溢出)**：已修复 Bug，即使因方块堆满结束游戏也会记录。
+3. **查看日志**：搜索 `[HISTORY]` 关键字查看写入是否成功。
 
-- **查看特定后端日志**:
-  ```bash
-  pm2 logs tetris-backend
-  ```
+### B. 聊天消息不显示或丢失
+1. **历史同步**：新加入房间时，服务器会自动发送最近的 **50条** 消息。如果不显示，请刷新页面重试。
+2. **滚动问题**：聊天窗口支持滚动，请尝试向上下滑动查看历史记录。
 
-- **查看 Nginx 访问/错误日志** (如果使用了 Nginx):
-  ```bash
-  sudo tail -f /var/log/nginx/access.log
-  sudo tail -f /var/log/nginx/error.log
-  ```
+### C. 无法连接 WebSocket
+如果浏览器控制台显示 `WebSocket connection failed`：
+1. **Nginx 配置**：确保 Nginx 正确代理了 `/socket.io/` 路径，并且启用了 `Upgrade` 和 `Connection "upgrade"` 头。
+   ```nginx
+   location /socket.io/ {
+       proxy_pass http://localhost:3000;
+       proxy_http_version 1.1;
+       proxy_set_header Upgrade $http_upgrade;
+       proxy_set_header Connection "upgrade";
+   }
+   ```
+2. **端口检查**：确保后端服务器正在运行且监听 3000 端口。
+   ```bash
+   netstat -tulnp | grep 3000
+   ```
 
-## 3. 常见问题
+### D. 端口已被占用 (EADDRINUSE)
+如果启动失败提示端口占用：
+```bash
+# 停止所有相关进程
+./stop_game.sh
 
-### 端口已被占用 (Port already in use)
-如果您看到类似 `EADDRINUSE` 的错误，意味着端口 (3000 或 5173) 已经被占用。
-- **解决方法**: 运行 `./stop_game.sh` 清除旧进程，或使用 `fuser -k 3000/tcp` 杀死特定进程。
-
-### 前端无法连接到后端
-如果游戏加载了但无法加入房间：
-- 检查 **后端日志** 查看服务器是否收到了连接。
-- 检查 **浏览器控制台** (F12 -> Console) 查看连接错误 (例如 `WebSocket connection failed`)。
+# 或者手动杀死进程
+fuser -k 3000/tcp
+fuser -k 5173/tcp
+```

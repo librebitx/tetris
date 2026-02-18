@@ -67,7 +67,8 @@ export function useSocket() {
 
         socket.value.on('chatMessage', (msg) => {
             chatMessages.push(msg);
-            if (chatMessages.length > 5) chatMessages.shift();
+            // Limit removed for scrollable history
+            if (chatMessages.length > 50) chatMessages.shift(); // Keep reasonable limit
         });
 
         socket.value.on('matchHistory', (history) => {
@@ -136,8 +137,10 @@ export function useSocket() {
     };
 
     const leaveRoom = () => {
+        console.log('useSocket: leaveRoom() invoked');
         try {
             if (socket.value) {
+                console.log('useSocket: emitting leaveRoom');
                 socket.value.emit('leaveRoom');
             }
         } catch (e) {
@@ -145,6 +148,7 @@ export function useSocket() {
         }
 
         // Always reset state
+        console.log('useSocket: Resetting local state...');
         currentRoom.value = null;
         playerColor.value = null;
         isHost.value = false;
@@ -158,6 +162,7 @@ export function useSocket() {
 
         chatMessages.splice(0);
         restartStatus.value = [];
+        console.log('useSocket: Local state reset. currentRoom:', currentRoom.value);
     };
 
     const resetToLobby = () => {

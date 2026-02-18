@@ -1,6 +1,6 @@
 <template>
   <div class="lobby-container">
-    <h1>俄罗斯方块据点争夺战（beta）</h1>
+    <h1>俄罗斯方块据点争夺战（Beta）</h1>
 
     
     <!-- Room Entry Step -->
@@ -13,17 +13,18 @@
             placeholder="请输入6位房间号"
             class="room-input"
         >
-        <button class="primary-btn" @click="handleJoin" :disabled="roomInput.length !== 6">创建/加入房间</button>
+        <button class="primary-btn" @click="handleJoin" :disabled="roomInput.length !== 6">创建 / 加入房间</button>
 
         <!-- Game Rules on entry -->
         <div class="rules-section">
           <h3>游戏规则</h3>
           <ul class="rules-list">
-            <li>双方各控制一组方块，从四个方向落下</li>
-            <li>方块落在棋盘边缘得 5 分</li>
+            <li>红蓝双方玩家各控制一组方块，方块由刷新区边线随机向四个方向前进，两组方块的前进方向永远相反</li>
             <li>限时模式：时间结束后分高者胜</li>
             <li>积分模式：先达目标分者胜</li>
-            <li>若一组的刷新区被堵塞，则按照当前分数判输赢</li>
+            <li>若有一组方块堵塞刷新区，则按照当前分数判输赢</li>
+            <li>方块落在棋盘边缘得 5 分</li>
+            <li>当一组方块填满背景中的 8、10、12、16 格的矩形区域时，额外获得 10、15、20、30 分</li>
           </ul>
         </div>
 
@@ -122,7 +123,7 @@
           <div class="setting-group">
             <label class="radio-label">
               <input type="radio" value="time" v-model="mode" @change="syncSettings"> 
-              限时
+              限时 <span v-if="mode === 'time'" style="font-size: 0.85em; color: #888; margin-left: 6px; font-weight: normal;">棋盘: {{ computedBoardSize }}×{{ computedBoardSize }}</span>
             </label>
             <select v-model.number="timeValue" :disabled="mode !== 'time'" @change="syncSettings" class="select-input">
               <option :value="1">1 分钟</option>
@@ -136,7 +137,7 @@
           <div class="setting-group">
             <label class="radio-label">
               <input type="radio" value="score" v-model="mode" @change="syncSettings"> 
-              积分
+              积分 <span v-if="mode === 'score'" style="font-size: 0.85em; color: #888; margin-left: 6px; font-weight: normal;">棋盘: {{ computedBoardSize }}×{{ computedBoardSize }}</span>
             </label>
             <select v-model.number="scoreValue" :disabled="mode !== 'score'" @change="syncSettings" class="select-input">
               <option :value="50">50 分</option>
@@ -167,7 +168,7 @@
             </div>
           </div>
 
-          <p class="board-size-hint">棋盘: {{ computedBoardSize }}×{{ computedBoardSize }}</p>
+
 
           <p v-if="gameState.playerCount < 2" class="waiting-hint">
               等待对手加入... ({{ gameState.playerCount }}/2)
@@ -204,8 +205,8 @@
       </div>
 
       <!-- Chat Messages -->
-      <div v-if="chatMessages.length" class="chat-log">
-        <div v-for="(msg, i) in recentChats" :key="i" class="chat-item">
+      <div v-if="chatMessages.length" class="chat-log" ref="chatContainer">
+        <div v-for="(msg, i) in chatMessages" :key="i" class="chat-item">
           <span class="chat-time">{{ formatChatTime(msg.time) }}</span>
           <span :class="getChatColorClass(msg.color)">{{ msg.name }}</span>:
           <span :class="{ 'system-text': msg.color === 'system' }">{{ msg.text }}</span>
@@ -262,8 +263,14 @@ const isGuestReady = computed(() => {
     return guest ? guest.isReady : false;
 });
 
-// Show last 5 chat messages
-const recentChats = computed(() => chatMessages.slice(-5));
+// Auto-scroll chat to bottom
+const chatContainer = ref(null);
+watch(() => chatMessages.length, async () => {
+  await nextTick();
+  if (chatContainer.value) {
+    chatContainer.value.scrollTop = chatContainer.value.scrollHeight;
+  }
+});
 
 // D-pad preview: scale only (toolbar handles centering)
 
@@ -305,10 +312,10 @@ const handleStart = () => {
 };
 
 const handleLeaveConfirm = () => {
-    if (confirm('确定要退出房间吗？')) {
-        leaveRoom();
-        window.location.reload();
-    }
+    // Removed confirm for now to debug user issue and improve UX
+    console.log('User clicked leave. Calling leaveRoom directly...');
+    leaveRoom();
+    console.log('leaveRoom called. currentRoom is now:', currentRoom.value);
 };
 </script>
 
@@ -366,7 +373,7 @@ h1 {
   font-size: 1.1em; /* Increased font */
   padding: 12px 16px; /* Increased hit area */
   cursor: pointer;
-  z-index: 10;
+  z-index: 100; /* Increased z-index */
 }
 .back-btn:hover {
   color: #ececec;
@@ -692,12 +699,12 @@ h1 {
   margin-top: 10px;
   padding-top: 8px;
   text-align: left;
+  max-height: 150px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column; /* Normal flow */
 }
-.chat-item {
-  color: #b4b4b4;
-  font-size: 0.85em;
-  margin: 4px 0;
-}
+
 .chat-item {
   color: #b4b4b4;
   font-size: 0.85em;
@@ -761,16 +768,21 @@ h1 {
   border-radius: 3px;
 }
 .h-winner-tag { font-weight: bold; }
-.t-red { color: #ff6b6b; }
-.t-blue { color: #4dabf7; }
+.t-red { color: #ff6b6b; font-weight: bold; }
+.t-blue { color: #4dabf7; font-weight: bold; }
+.t-draw { color: #a0a0a0; font-weight: bold; }
 .surrender-mini-tag {
-    font-size: 0.75em;
+    font-size: 0.7em;
     background: #444;
     color: #ccc;
     padding: 1px 4px;
-    border-radius: 4px;
-    margin-left: 6px;
-    white-space: nowrap;
+    border-radius: 3px;
+    margin-left: 5px; /* Red: [Dot] [Tag] */
+    margin-right: 0;
+}
+.surrender-left {
+    margin-left: 0;
+    margin-right: 5px; /* Blue: [Tag] [Dot] */
 }
 
 .surrender-mini-tag.surrender-left {

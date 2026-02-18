@@ -2,11 +2,48 @@
   <div class="game-container">
     <!-- Top 70%: Board Zone -->
     <div class="board-zone">
-      <div v-if="gameState.config?.winner" class="overlay">
+      <div v-if="gameState.config?.winner && !isReviewing" class="overlay">
         <div class="overlay-card">
-          <h2 v-if="gameState.config.winner === 'Draw'">🤝 平局！</h2>
-          <h2 v-else>{{ gameState.config.winner === 'Red' ? '🔴 红方' : '🔵 蓝方' }} 获胜！</h2>
-          <p class="final-score">{{ gameState.stats.redScore }} - {{ gameState.stats.blueScore }}</p>
+          <!-- History Style Score Card -->
+          <div class="result-card">
+              <div class="h-top">
+                  <span class="h-mode-tag">{{ gameState.config.mode === 'time' ? '限时' : '积分' }}</span>
+                  <span class="h-winner-tag" :class="gameState.config.winner === 'Red' ? 't-red' : (gameState.config.winner === 'Blue' ? 't-blue' : 't-draw')">
+                      {{ gameState.config.winner === 'Red' ? '红方获胜' : (gameState.config.winner === 'Blue' ? '蓝方获胜' : '平局') }}
+                  </span>
+              </div>
+              <div class="h-main-row">
+                   <!-- Red Side -->
+                   <div class="h-player-side side-left" :class="{ 'is-win': gameState.config.winner === 'Red' }">
+                       <div class="h-info-group">
+                           <div class="h-dot-row">
+                               <span class="h-dot red"></span>
+                               <span v-if="gameState.config.surrender?.by === 'Red'" class="surrender-mini-tag">
+                                   {{ gameState.config.surrender.type === 'disconnect' ? '逃跑' : '认输' }}
+                               </span>
+                           </div>
+                           <span class="h-name">{{ getPlayerName('red') }}</span>
+                       </div>
+                       <span class="h-score-num">{{ gameState.stats.redScore }}</span>
+                   </div>
+                   
+                   <div class="h-vs">VS</div>
+                   
+                   <!-- Blue Side -->
+                   <div class="h-player-side side-right" :class="{ 'is-win': gameState.config.winner === 'Blue' }">
+                       <span class="h-score-num">{{ gameState.stats.blueScore }}</span>
+                       <div class="h-info-group">
+                           <div class="h-dot-row">
+                               <span v-if="gameState.config.surrender?.by === 'Blue'" class="surrender-mini-tag surrender-left">
+                                   {{ gameState.config.surrender.type === 'disconnect' ? '逃跑' : '认输' }}
+                               </span>
+                               <span class="h-dot blue"></span>
+                           </div>
+                           <span class="h-name">{{ getPlayerName('blue') }}</span>
+                       </div>
+                   </div>
+              </div>
+          </div>
           
           <!-- Restart Status -->
           <div class="restart-status-row">
@@ -42,9 +79,18 @@
           </div>
         </div>
       </div>
+      
+          <!-- Review Button -->
+          <button class="secondary-btn" style="width: 100%; margin-bottom: 10px;" @click="toggleReview">对局复盘</button>
+          
           <button class="leave-btn" @click="handleLeave">退出房间</button>
         </div>
       </div>
+      
+      <!-- Back to Result Button (Visible during Review) -->
+      <button v-if="gameState.config?.winner && isReviewing" class="back-result-btn" @click="toggleReview">
+          返回结算
+      </button>
 
       <div class="hud">
         <div class="status-text">{{ statusText }}</div>
@@ -58,6 +104,11 @@
           <span class="score-blue">蓝方 {{ gameState.stats.blueScore || 0 }}</span>
         </div>
       </div>
+
+      <!-- Score Toggle Button -->
+      <button class="toggle-score-btn" @click="toggleScores" :class="{ active: showScores }">
+          {{ showScores ? '隐藏分数' : '显示分数' }}
+      </button>
 
       <!-- Surrender button -->
       <button v-if="gameState.config?.active && playerColor" class="surrender-btn" @click="handleSurrender">认输</button>
@@ -179,9 +230,8 @@ const statusText = computed(() => {
 
 
 const handleSurrender = () => {
-  if (confirm('确定认输？')) {
+    // Removed confirm for better UX and debugging
     surrender();
-  }
 };
 
 const showLeaveConfirm = ref(false);
@@ -197,6 +247,31 @@ const confirmLeave = () => {
     window.location.reload();
 };
 
+const isReviewing = ref(false);
+
+const toggleReview = () => {
+    isReviewing.value = !isReviewing.value;
+};
+
+// Reset review state on game restart or reset
+watch(() => gameState.config?.active, (active) => {
+    if (active) isReviewing.value = false;
+});
+
+const showScores = ref(false); // Default hidden
+
+const toggleScores = () => {
+    showScores.value = !showScores.value;
+    draw(); // Re-draw immediately
+};
+
+
+const getPlayerName = (color) => {
+    if (!gameState.players) return '???';
+    const p = Object.values(gameState.players).find(p => p.color === color);
+    return p ? p.name : '???';
+};
+
 // Drawing
 const draw = () => {
   const canvas = canvasRef.value;
@@ -207,6 +282,47 @@ const draw = () => {
   ctx.fillStyle = '#08080e';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
+  // Draw Background Rectangles (if available)
+  if (gameState.config?.bgRects) {
+      // Mapping area size to colors with LOW OPACITY (0.2) to not overly distract
+      const colorMap = {
+          8: 'rgba(46, 125, 50, 0.2)',    // Green
+          10: 'rgba(245, 127, 23, 0.2)',  // Orange
+          12: 'rgba(106, 27, 154, 0.2)',  // Purple
+          16: 'rgba(0, 105, 92, 0.2)'     // Teal
+      };
+      // Fallback color
+      const defaultColor = 'rgba(55, 71, 79, 0.2)'; // Blue Grey
+
+      // Score Map for display (defined here for both passes)
+      const scoreMap = { 8: 10, 10: 15, 12: 20, 16: 30 };
+
+      // 1. Draw Background Rects (Behind Grid/Pieces)
+      gameState.config.bgRects.forEach(rect => {
+          const area = rect.w * rect.h;
+          const color = colorMap[area] || defaultColor;
+          
+          ctx.fillStyle = color;
+          // Fill rectangle
+          ctx.fillRect(
+              rect.x * BLOCK_SIZE, 
+              rect.y * BLOCK_SIZE, 
+              rect.w * BLOCK_SIZE, 
+              rect.h * BLOCK_SIZE
+          );
+          // Optional: Add subtle border to distinguish tiles
+          ctx.strokeStyle = '#000'; // Black border between tiles
+          ctx.lineWidth = 1;
+          ctx.strokeRect(
+              rect.x * BLOCK_SIZE, 
+              rect.y * BLOCK_SIZE, 
+              rect.w * BLOCK_SIZE, 
+              rect.h * BLOCK_SIZE
+          );
+      });
+  }
+
+  // 2. Draw Grid & Pieces
   // Draw Grid
   ctx.strokeStyle = 'rgba(255, 255, 255, 0.04)';
   ctx.lineWidth = 1;
@@ -227,10 +343,11 @@ const draw = () => {
 
   // Draw Spawn Zone Highlight (Center 4x4)
   const zoneStart = Math.floor(cols / 2) - 2;
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.04)';
+  ctx.fillStyle = '#000000'; // Black Fill
   ctx.fillRect(zoneStart * BLOCK_SIZE, zoneStart * BLOCK_SIZE, 4 * BLOCK_SIZE, 4 * BLOCK_SIZE);
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
-  ctx.setLineDash([4, 4]);
+  ctx.strokeStyle = '#ffffff'; // White Dashed Outline
+  ctx.lineWidth = 2; // Make it visible
+  ctx.setLineDash([8, 6]); // Distinct dash pattern
   ctx.strokeRect(zoneStart * BLOCK_SIZE, zoneStart * BLOCK_SIZE, 4 * BLOCK_SIZE, 4 * BLOCK_SIZE);
   ctx.setLineDash([]);
 
@@ -262,11 +379,81 @@ const draw = () => {
                     const x = (player.piece.x + c) * BLOCK_SIZE;
                     const y = (player.piece.y + r) * BLOCK_SIZE;
                     ctx.fillRect(x + 1, y + 1, BLOCK_SIZE - 2, BLOCK_SIZE - 2);
+                    
+                    // Add White Outline for active pieces (Only for own piece)
+                    if (player.color === playerColor.value) {
+                        ctx.strokeStyle = '#ffffff';
+                        ctx.lineWidth = 2;
+                        ctx.strokeRect(x + 1, y + 1, BLOCK_SIZE - 2, BLOCK_SIZE - 2);
+                    }
                 }
             }
         }
         ctx.shadowBlur = 0;
     });
+  }
+
+  // 3. Draw Scores (On Top of Everything)
+  if (gameState.config?.bgRects && showScores.value) {
+      // Score Map for display
+      const scoreMap = { 8: 10, 10: 15, 12: 20, 16: 30 };
+      
+      gameState.config.bgRects.forEach(rect => {
+          const area = rect.w * rect.h;
+          const score = scoreMap[area];
+          
+          if (score) {
+              // Check ownership
+              let isRed = true;
+              let isBlue = true;
+              
+              // Only check if board exists
+              if (gameState.board && gameState.board.length > 0) {
+                  for (let r = rect.y; r < rect.y + rect.h; r++) {
+                      for (let c = rect.x; c < rect.x + rect.w; c++) {
+                          // Boundary check
+                          if (r >= 0 && r < gameState.config.boardSize && c >= 0 && c < gameState.config.boardSize) {
+                              const val = gameState.board[r][c];
+                              if (val !== 1) isRed = false;
+                              if (val !== 2) isBlue = false;
+                          }
+                      }
+                  }
+              } else {
+                  isRed = false;
+                  isBlue = false;
+              }
+
+              // Apply Styles
+              ctx.font = 'bold 30px monospace'; // Changed to monospace
+              ctx.textAlign = 'center';
+              ctx.textBaseline = 'middle';
+              
+              const centerX = (rect.x + rect.w / 2) * BLOCK_SIZE;
+              const centerY = (rect.y + rect.h / 2) * BLOCK_SIZE;
+
+              if (isRed) {
+                  // Red Owned
+                  ctx.fillStyle = '#ff6b6b'; 
+                  ctx.lineWidth = 4;
+                  ctx.strokeStyle = '#ffffff';
+                  ctx.strokeText('+' + score, centerX, centerY);
+                  ctx.fillText('+' + score, centerX, centerY);
+              } else if (isBlue) {
+                  // Blue Owned
+                  ctx.fillStyle = '#4dabf7';
+                  ctx.lineWidth = 4;
+                  ctx.strokeStyle = '#ffffff';
+                  ctx.strokeText('+' + score, centerX, centerY);
+                  ctx.fillText('+' + score, centerX, centerY);
+              } else {
+                  // Default (No Outline)
+                  ctx.fillStyle = '#9ee79eff'; // Bright Green
+                  // No stroke for default
+                  ctx.fillText('+' + score, centerX, centerY);
+              }
+          }
+      });
   }
 };
 
@@ -443,7 +630,7 @@ canvas {
 .surrender-btn {
   position: absolute;
   top: 16px;
-  right: 16px;
+  right: 110px; /* Left of toggle button (was 16px) */
   padding: 6px 16px;
   font-size: 0.85em;
   border-radius: 6px;
@@ -456,6 +643,30 @@ canvas {
 .surrender-btn:hover {
   background: #502020;
   color: #ffaaaa;
+}
+
+.toggle-score-btn {
+  position: absolute;
+  top: 16px;
+  right: 16px; /* Rightmost (was 80px) */
+  padding: 6px 12px;
+  font-size: 0.85em;
+  border-radius: 6px;
+  background: rgba(30, 30, 30, 0.9);
+  border: 1px solid #555;
+  color: #aaa;
+  cursor: pointer;
+  z-index: 200;
+  transition: all 0.2s;
+}
+.toggle-score-btn:hover {
+  background: #444;
+  color: #fff;
+}
+.toggle-score-btn.active {
+  background: rgba(16, 163, 127, 0.2);
+  border-color: #10a37f;
+  color: #10a37f;
 }
 
 /* Modal Overlay */
@@ -615,5 +826,148 @@ canvas {
   0% { box-shadow: 0 0 0 0 rgba(16, 163, 127, 0.7); }
   70% { box-shadow: 0 0 0 10px rgba(16, 163, 127, 0); }
   100% { box-shadow: 0 0 0 0 rgba(16, 163, 127, 0); }
+}
+
+.back-result-btn {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 8px 24px;
+  background: #2f2f2f;
+  border: 1px solid #555;
+  color: #ececec;
+  border-radius: 20px;
+  cursor: pointer;
+  z-index: 200;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+  font-weight: bold;
+}
+.back-result-btn:hover {
+  background: #444;
+  border-color: #777;
+}
+
+/* Result Card (History Style) */
+.result-card {
+  background: #3a3a3a;
+  border-radius: 8px;
+  padding: 16px 20px;
+  margin-bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  box-sizing: border-box;
+  animation: fadeIn 0.5s ease-out;
+}
+
+@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+.h-top {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  font-size: 0.9em;
+  color: #888;
+  border-bottom: 1px solid #4a4a4a;
+  padding-bottom: 8px;
+  margin-bottom: 4px;
+}
+.h-mode-tag {
+  background: #444;
+  padding: 2px 6px;
+  border-radius: 4px;
+  justify-self: start;
+}
+.h-winner-tag {
+  justify-self: end;
+  font-weight: bold;
+}
+.t-red { color: #ff6b6b; }
+.t-blue { color: #4dabf7; }
+.t-draw { color: #ccc; }
+
+.h-main-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.h-player-side {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 1.1em;
+  color: #aaa;
+  transition: all 0.3s;
+}
+.side-left { justify-content: flex-start; }
+.side-right { justify-content: flex-end; }
+
+.h-player-side.is-win {
+  color: #fff;
+  font-weight: 700;
+  text-shadow: 0 0 10px rgba(255,255,255,0.2);
+  transform: scale(1.05);
+}
+
+.h-info-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.side-left .h-info-group { align-items: flex-start; }
+.side-right .h-info-group { align-items: flex-end; }
+
+.h-dot-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.h-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+}
+.h-dot.red { background: #ff6b6b; box-shadow: 0 0 6px #ff6b6b; }
+.h-dot.blue { background: #4dabf7; box-shadow: 0 0 6px #4dabf7; }
+
+.h-name {
+    font-size: 0.9em;
+    color: #ccc;
+    max-width: 100px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.h-score-num {
+    font-family: 'Courier New', monospace;
+    font-size: 1.8em;
+    font-weight: 800;
+    line-height: 1;
+}
+
+.h-vs {
+    font-weight: 900;
+    color: #555;
+    font-style: italic;
+    font-size: 1.2em;
+    margin: 0 16px;
+}
+
+.surrender-mini-tag {
+    font-size: 0.75em;
+    background: #555;
+    color: #ddd;
+    padding: 1px 5px;
+    border-radius: 4px;
+}
+
+.surrender-mini-tag.surrender-left {
+    margin-left: 0;
+    margin-right: 6px;
 }
 </style>

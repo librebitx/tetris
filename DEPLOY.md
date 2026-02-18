@@ -1,134 +1,94 @@
-# 在 Debian 12 上部署多人俄罗斯方块
+# 部署指南 (Deployment Guide)
 
-本指南将带您完成在 Debian 12 服务器上部署多人俄罗斯方块游戏的过程。
-我们将使用 **Node.js** 作为后端，**Vite** 用于前端构建，**PM2** 进行进程管理，以及 **Nginx** 作为反向代理。
+本指南介绍如何在运行 **Debian 12** 的服务器上部署多人俄罗斯方块游戏。
 
-## 前置条件
+## 📋 架构概览
 
-- 一台运行 **Debian 12** 的服务器。
-- Root 或 sudo 权限。
-- 基本的命令行知识。
+- **前端**: Vue 3 + Vite (构建为静态文件，由 Nginx 托管)
+- **后端**: Node.js + Socket.io (由 PM2 管理进程)
+- **反向代理**: Nginx (处理 HTTP 请求和 WebSocket 转发)
 
-## 1. 系统设置
+## 1. 环境准备 (Prerequisites)
 
-更新系统软件包：
-
+### 更新系统
 ```bash
 sudo apt update && sudo apt upgrade -y
 ```
 
-安装必要的工具：
-
-```bash
-sudo apt install -y curl git unzip build-essential
-```
-
-## 2. 安装 Node.js (v20 或更高版本)
-
-我们将使用 NodeSource 安装较新版本的 Node.js。
-
+### 安装 Node.js (v20+)
+推荐使用 NodeSource 安装最新 LTS 版本：
 ```bash
 curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
-sudo apt install -y nodejs
+sudo apt install -y nodejs build-essential
 ```
 
-验证安装：
-
-```bash
-node -v
-npm -v
-```
-
-## 3. 项目设置
-
-将您的项目代码上传到服务器（例如，上传到 `/opt/tetris`）。
-
-```bash
-# 示例：创建目录
-sudo mkdir -p /opt/tetris
-# (在此处上传您的文件)
-cd /opt/tetris
-```
-
-### 后端设置
-
-进入 `tetris-shared` 目录并安装依赖：
-
-```bash
-cd tetris-shared
-npm install
-```
-
-### 前端设置
-
-进入 `tetris-vue` 目录并安装依赖：
-
-```bash
-cd ../tetris-vue
-npm install
-```
-
-构建生产环境前端代码：
-
-```bash
-npm run build
-```
-
-这将在 `tetris-vue/dist` 中创建一个 `dist` 目录。
-
-## 4. 使用 PM2 进行进程管理
-
-全局安装 PM2 以保持后端持续运行：
-
+### 安装 PM2 和 Nginx
 ```bash
 sudo npm install -g pm2
-```
-
-启动后端服务器：
-
-```bash
-cd ../tetris-shared
-# 启动 server.js (后端入口点)
-pm2 start server.js --name "tetris-backend"
-```
-
-保存进程列表并配置 PM2 开机自启：
-
-```bash
-pm2 save
-pm2 startup
-# 按照命令输出的提示运行生成的命令以启用启动钩子
-```
-
-## 5. Nginx 配置
-
-安装 Nginx：
-
-```bash
 sudo apt install -y nginx
 ```
 
-创建一个新的 Nginx 配置文件：
+## 2. 项目部署 (Deployment)
 
+假设项目部署在 `/opt/tetris` 目录。
+
+### 上传代码
+将本地项目上传到服务器：
+```bash
+# 示例：创建目录并赋权
+sudo mkdir -p /opt/tetris
+sudo chown -R $USER:$USER /opt/tetris
+# (通过 SCP 或 Git 将代码传输到 /opt/tetris)
+```
+
+### 后端安装与启动
+```bash
+cd /opt/tetris/tetris-shared
+
+# 安装生产依赖
+npm ci --omit=dev
+
+# 启动服务
+pm2 start server.js --name "tetris-backend"
+
+# 保存进程列表并设置开机自启
+pm2 save
+pm2 startup
+```
+
+### 前端构建
+```bash
+cd /opt/tetris/tetris-vue
+
+# 安装依赖
+npm ci
+
+# 构建生产版本
+npm run build
+# 构建完成后，生成的静态文件位于 dist/ 目录
+```
+
+## 3. 配置 Nginx (Configuration)
+
+创建站点配置文件：
 ```bash
 sudo nano /etc/nginx/sites-available/tetris
 ```
 
-粘贴以下配置（将 `your_domain_or_ip` 替换为您的实际域名或服务器 IP）：
-
+**配置内容** (替换 `your_domain_or_ip`):
 ```nginx
 server {
     listen 80;
     server_name your_domain_or_ip;
 
-    # 前端 (提供静态文件)
+    # 前端静态文件
     location / {
         root /opt/tetris/tetris-vue/dist;
         try_files $uri $uri/ /index.html;
         index index.html;
     }
 
-    # 后端 (Socket.io & API)
+    # 后端 API & WebSocket 代理
     location /socket.io/ {
         proxy_pass http://localhost:3000;
         proxy_http_version 1.1;
@@ -141,29 +101,19 @@ server {
 ```
 
 启用站点并重启 Nginx：
-
 ```bash
 sudo ln -s /etc/nginx/sites-available/tetris /etc/nginx/sites-enabled/
 sudo nginx -t
 sudo systemctl restart nginx
 ```
 
-## 6. 防火墙 (可选但推荐)
+## 4. 验证与维护
 
-如果您启用了 `ufw`，允许 Nginx 通行：
-
-```bash
-sudo ufw allow 'Nginx Full'
-```
-
-## 7. 验证
-
-在浏览器中访问 `http://your_domain_or_ip`。游戏应该可以加载，并且您应该能够创建房间并进行游戏。
-
----
-
-## 故障排除
-
-- **后端日志**: `pm2 logs tetris-backend`
-- **Nginx 日志**: `sudo tail -f /var/log/nginx/error.log`
-- **权限**: 确保运行 Nginx 的用户（通常是 `www-data` 或 `root`，取决于设置）可以读取 `/opt/tetris` 中的文件。
+- **访问**: 打开浏览器访问 `http://your_domain_or_ip`。
+- **日志查看**:
+  - 后端: `pm2 logs tetris-backend`
+  - Nginx: `sudo tail -f /var/log/nginx/error.log`
+- **更新代码**:
+  1. 拉取新代码。
+  2. 后端: `pm2 restart tetris-backend`。
+  3. 前端: 重新运行 `npm run build`。

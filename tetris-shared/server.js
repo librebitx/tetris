@@ -63,6 +63,103 @@ function generateRandomLetters(n) {
     return result;
 }
 
+// Tiling Logic
+function partitionLine(totalWidth, allowedWidths) {
+    // Try multiple times to find a random valid partition
+    for (let attempt = 0; attempt < 50; attempt++) {
+        let current = 0;
+        let line = [];
+        while (current < totalWidth) {
+            const possible = allowedWidths.filter(w => current + w <= totalWidth);
+            if (possible.length === 0) break;
+            const w = possible[Math.floor(Math.random() * possible.length)];
+            line.push(w);
+            current += w;
+        }
+        if (current === totalWidth) return line;
+    }
+    // Fallback: fill with smallest unit
+    const minW = Math.min(...allowedWidths);
+    // If totalWidth is not divisible by minW (shouldn't happen with 20/40 and even inputs), this might be slightly off, but 20/40 are divisible by 2 and 4.
+    return Array(Math.floor(totalWidth / minW)).fill(minW);
+}
+
+function generateTiling(rows, cols) {
+    const rects = [];
+
+    // Define exclusion zone (center 4x4)
+    const zoneX = Math.floor(cols / 2) - 2;
+    const zoneY = Math.floor(rows / 2) - 2;
+    const zoneW = 4;
+    const zoneH = 4;
+
+    // Helper to fill a strip at y with height h, covering x range [start, end)
+    const fillStrip = (y, h, start, end) => {
+        const width = end - start;
+        if (width <= 0) return;
+
+        // Adjust allowed widths based on total width available
+        let allowed = (h === 4) ? [2, 3, 4] : [4, 5, 6, 8];
+
+        // Filter allowed to ensure we don't pick something larger than total width
+        // If width is very small (e.g. < min allowed), we rely on partitionLine fallback
+        allowed = allowed.filter(w => w <= width);
+        if (allowed.length === 0) {
+            // Fallback if space is tiny. 
+            if (h === 4 && width < 2) allowed = [width];
+            else if (h === 2 && width < 4) allowed = [width];
+        }
+
+        const widths = partitionLine(width, allowed);
+
+        let currentX = start;
+        for (let w of widths) {
+            rects.push({
+                x: currentX,
+                y: y,
+                w: w,
+                h: h,
+                // Assign a random color index/type for frontend styling
+                colorType: Math.floor(Math.random() * 6) // 0-5
+            });
+            currentX += w;
+        }
+    };
+
+    let currentRow = 0;
+    while (currentRow < rows) {
+        // Determine strip height
+        let h = 2;
+
+        // If we are approaching zoneY, don't overshoot.
+        if (currentRow < zoneY && currentRow + 4 <= zoneY && Math.random() < 0.5) h = 4;
+        else if (currentRow < zoneY && currentRow + 2 > zoneY) h = zoneY - currentRow; // Should be 2 or gap fill
+
+        // If inside zone vertical range
+        if (currentRow >= zoneY && currentRow < zoneY + zoneH) {
+            h = 2; // Keep it fine-grained inside zone rows
+            // Force alignment to zoneH ends
+            if (currentRow + h > zoneY + zoneH) h = zoneY + zoneH - currentRow;
+        } else if (currentRow >= zoneY + zoneH) {
+            // Below zone
+            if (rows - currentRow >= 4 && Math.random() < 0.5) h = 4;
+        }
+
+        // Generate Strips
+        if (currentRow >= zoneY && currentRow < zoneY + zoneH) {
+            // Split strip: Left of Zone, Right of Zone
+            fillStrip(currentRow, h, 0, zoneX);
+            fillStrip(currentRow, h, zoneX + zoneW, cols);
+        } else {
+            // Full strip
+            fillStrip(currentRow, h, 0, cols);
+        }
+
+        currentRow += h;
+    }
+    return rects;
+}
+
 function broadcastLobbyStats() {
     const clients = io.engine.clientsCount;
     const idleRooms = Object.values(rooms)
@@ -83,12 +180,15 @@ class Room {
         this.chatMessages = []; // Quick chat messages
         this.gameConfig = {
             mode: 'score', // Default
-            value: 500,    // Default
+            value: 200,    // Default
             startTime: 0,
             active: false,
-            winner: null
+            winner: null,
+            bgRects: [] // Background tiling
         };
         this.restartRequests = new Set(); // Initialize here
+        // Initial tiling
+        this.gameConfig.bgRects = generateTiling(this.rows, this.cols);
     }
 
     getNextPiece(playerId) {
@@ -113,54 +213,119 @@ class Room {
 
         const shape = SHAPES[shapeIdx];
 
-        // Omni-Directional Gravity
-        const activeDirs = Object.values(this.players)
-            .filter(p => p.piece && p.id !== playerId)
-            .map(p => p.piece.dir)
-            .filter(d => d !== undefined);
+        // Validated Spawn Logic
+        // 1. Identify Opponent's Direction
+        const opponentColor = playerColor === 'red' ? 'blue' : 'red';
+        const opponent = Object.values(this.players).find(p => p.color === opponentColor);
 
-        // 0: Up (y--), 1: Right (x++), 2: Down (y++), 3: Left (x--)
-        let availableDirs = [0, 1, 2, 3].filter(d => !activeDirs.includes(d));
-        if (availableDirs.length === 0) availableDirs = [0, 1, 2, 3];
+        let availableDirs = [0, 1, 2, 3];
+        if (opponent && opponent.piece && opponent.piece.dir !== undefined) {
+            // Exclude opponent's direction
+            availableDirs = availableDirs.filter(d => d !== opponent.piece.dir);
+        }
 
-        const dir = availableDirs[Math.floor(Math.random() * availableDirs.length)];
-        let dx = 0, dy = 0;
-        if (dir === 0) dy = -1;      // Fall Up
-        else if (dir === 1) dx = 1;  // Fall Right
-        else if (dir === 2) dy = 1;  // Fall Down
-        else if (dir === 3) dx = -1; // Fall Left
+        // 2. Shuffle Directions
+        for (let i = availableDirs.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [availableDirs[i], availableDirs[j]] = [availableDirs[j], availableDirs[i]];
+        }
 
-        // Consistent spawn position: align leading edge to center zone boundary
+        // Common Constants
         const centerX = Math.floor(this.cols / 2);
         const centerY = Math.floor(this.rows / 2);
-        const zoneStart = centerX - 2; // center zone start
-        const zoneEnd = centerX + 2;   // center zone end
+        const zoneStart = centerX - 2;
+        const zoneEnd = centerX + 2;
         const shapeW = shape[0].length;
         const shapeH = shape.length;
 
-        let spawnX, spawnY;
-        if (dir === 2) {
-            spawnX = centerX - Math.floor(shapeW / 2);
-            spawnY = zoneStart;
-        } else if (dir === 0) {
-            spawnX = centerX - Math.floor(shapeW / 2);
-            spawnY = zoneEnd - shapeH;
-        } else if (dir === 1) {
-            spawnX = zoneStart;
-            spawnY = centerY - Math.floor(shapeH / 2);
-        } else {
-            spawnX = zoneEnd - shapeW;
-            spawnY = centerY - Math.floor(shapeH / 2);
+        // 3. Find First Valid Non-Overlapping Position
+        let finalDir = availableDirs[0];
+        let finalSpawn = null;
+        let finalDx = 0, finalDy = 0;
+
+        for (const dir of availableDirs) {
+            let dx = 0, dy = 0;
+            let sx, sy;
+
+            if (dir === 0) { // Up
+                dy = -1;
+                sx = centerX - Math.floor(shapeW / 2);
+                sy = zoneStart;
+            } else if (dir === 1) { // Right
+                dx = 1;
+                sx = zoneEnd - shapeW;
+                sy = centerY - Math.floor(shapeH / 2);
+            } else if (dir === 2) { // Down
+                dy = 1;
+                sx = centerX - Math.floor(shapeW / 2);
+                sy = zoneEnd - shapeH;
+            } else if (dir === 3) { // Left
+                dx = -1;
+                sx = zoneStart;
+                sy = centerY - Math.floor(shapeH / 2);
+            }
+
+            // Check Collision with Opponent's Active Piece
+            let overlap = false;
+            if (opponent && opponent.piece) {
+                const oppP = opponent.piece;
+                const oppShape = oppP.shape;
+
+                // Compare every block of new piece vs every block of opponent piece
+                for (let r = 0; r < shapeH; r++) {
+                    for (let c = 0; c < shapeW; c++) {
+                        if (shape[r][c]) { // If my block exists
+                            const myX = sx + c;
+                            const myY = sy + r;
+
+                            // Check against opponent blocks
+                            for (let or = 0; or < oppShape.length; or++) {
+                                for (let oc = 0; oc < oppShape[or].length; oc++) {
+                                    if (oppShape[or][oc]) { // If opp block exists
+                                        const oppX = oppP.x + oc;
+                                        const oppY = oppP.y + or;
+                                        if (myX === oppX && myY === oppY) {
+                                            overlap = true;
+                                            break;
+                                        }
+                                    }
+                                }
+                                if (overlap) break;
+                            }
+                        }
+                        if (overlap) break;
+                    }
+                    if (overlap) break;
+                }
+            }
+
+            if (!overlap) {
+                finalDir = dir;
+                finalSpawn = { x: sx, y: sy };
+                finalDx = dx;
+                finalDy = dy;
+                break; // Found a valid spot!
+            }
+        }
+
+        // Fallback if all overlapped (unlikely but possible) -> Just use the last one checked or the first available
+        if (!finalSpawn) {
+            finalDir = availableDirs[0];
+            // Re-calculate simply for the chosen one
+            if (finalDir === 0) { finalDy = -1; finalSpawn = { x: centerX - Math.floor(shapeW / 2), y: zoneStart }; }
+            else if (finalDir === 1) { finalDx = 1; finalSpawn = { x: zoneEnd - shapeW, y: centerY - Math.floor(shapeH / 2) }; }
+            else if (finalDir === 2) { finalDy = 1; finalSpawn = { x: centerX - Math.floor(shapeW / 2), y: zoneEnd - shapeH }; }
+            else { finalDx = -1; finalSpawn = { x: zoneStart, y: centerY - Math.floor(shapeH / 2) }; }
         }
 
         return {
             shape: shape,
-            x: spawnX,
-            y: spawnY,
+            x: finalSpawn.x,
+            y: finalSpawn.y,
             colorIdx: playerColor === 'red' ? 1 : 2,
-            dir: dir,
-            gravDx: dx,
-            gravDy: dy
+            dir: finalDir,
+            gravDx: finalDx,
+            gravDy: finalDy
         };
     }
 
@@ -229,6 +394,7 @@ class Room {
             this.gameConfig.active = false;
             this.gameConfig.winner = stats.redScore > stats.blueScore ? 'Red'
                 : (stats.blueScore > stats.redScore ? 'Blue' : 'Draw');
+            this.saveMatchRecord(stats);
         }
     }
 
@@ -239,6 +405,7 @@ class Room {
         let redScore = 0;
         let blueScore = 0;
 
+        // 1. Basic Cell Counting & Perimeter Score
         for (let r = 0; r < this.rows; r++) {
             for (let c = 0; c < this.cols; c++) {
                 const val = this.board[r][c];
@@ -255,6 +422,38 @@ class Room {
                 }
             }
         }
+
+        // 2. Area Capture Scoring
+        // 8->10, 10->15, 12->20, 16->30
+        const scoreMap = { 8: 10, 10: 15, 12: 20, 16: 30 };
+
+        if (this.gameConfig && this.gameConfig.bgRects) {
+            for (const rect of this.gameConfig.bgRects) {
+                let isRed = true;
+                let isBlue = true;
+
+                // Check all cells in this rect
+                for (let r = rect.y; r < rect.y + rect.h; r++) {
+                    for (let c = rect.x; c < rect.x + rect.w; c++) {
+                        // Safety check for bounds
+                        if (r < 0 || r >= this.rows || c < 0 || c >= this.cols) continue;
+
+                        const val = this.board[r][c];
+                        if (val !== 1) isRed = false;
+                        if (val !== 2) isBlue = false;
+                        if (!isRed && !isBlue) break;
+                    }
+                    if (!isRed && !isBlue) break;
+                }
+
+                if (isRed) {
+                    redScore += (scoreMap[rect.w * rect.h] || 0);
+                } else if (isBlue) {
+                    blueScore += (scoreMap[rect.w * rect.h] || 0);
+                }
+            }
+        }
+
         return { red: redCount, blue: blueCount, total: total, redScore, blueScore };
     }
 
@@ -282,9 +481,11 @@ class Room {
                     if (stats.redScore >= this.gameConfig.value) {
                         this.gameConfig.active = false;
                         this.gameConfig.winner = 'Red';
+                        console.log('Game Over (Score): Red Wins');
                     } else if (stats.blueScore >= this.gameConfig.value) {
                         this.gameConfig.active = false;
                         this.gameConfig.winner = 'Blue';
+                        console.log('Game Over (Score): Blue Wins');
                     }
                 }
 
@@ -349,13 +550,16 @@ class Room {
             startTime: Date.now(),
             active: true,
             winner: null,
-            boardSize: this.rows
+            surrender: null, // Reset surrender
+            boardSize: this.rows,
+            bgRects: generateTiling(this.rows, this.cols)
         };
         this.restartRequests = new Set(); // Track colors requesting restart
         this.startGameLoop();
     }
 
     saveMatchRecord(stats, surrenderInfo = null) {
+        console.log(`[HISTORY] Saving match record for room ${this.code}. Winner: ${this.gameConfig.winner}`);
         const players = Object.values(this.players).filter(p => p.color !== 'spectator');
         const redPlayer = players.find(p => p.color === 'red');
         const bluePlayer = players.find(p => p.color === 'blue');
@@ -378,6 +582,16 @@ class Room {
 
         // Broadcast updated history to everyone (Lobby + Rooms)
         io.emit('matchHistory', matchHistory.slice(0, 10));
+    }
+}
+
+function saveHistoryToFile() {
+    try {
+        console.log(`[HISTORY] Writing ${matchHistory.length} records to file...`);
+        fs.writeFileSync(HISTORY_FILE, JSON.stringify(matchHistory, null, 2));
+        console.log('[HISTORY] File write successful.');
+    } catch (e) {
+        console.error('Failed to save history:', e);
     }
 }
 
@@ -475,14 +689,19 @@ io.on('connection', (socket) => {
 
         // System Chat Message: Create or Join
         const actionDisplay = existingPlayers === 0 ? '创建' : '加入';
+        // Send existing chat history to the new player (before adding their join message)
+        room.chatMessages.forEach(msg => {
+            socket.emit('chatMessage', msg);
+        });
+
         const sysMsg = {
             name: '系统',
             color: 'system',
-            text: `${playerName} ${actionDisplay}了房间`,
+            text: `${playerName} 加入了房间`,
             time: Date.now()
         };
         room.chatMessages.push(sysMsg);
-        if (room.chatMessages.length > 20) room.chatMessages.shift();
+        if (room.chatMessages.length > 50) room.chatMessages.shift();
         io.to(roomCode).emit('chatMessage', sysMsg);
 
         // Broadcast update to Room
@@ -556,6 +775,43 @@ io.on('connection', (socket) => {
         room.resetGame(config);
     });
 
+    socket.on('surrender', () => {
+        if (!socket.roomCode || !rooms[socket.roomCode]) return;
+        const room = rooms[socket.roomCode];
+
+        if (!room.gameConfig.active) return;
+        const player = room.players[socket.id];
+        if (!player || player.color === 'spectator') return;
+
+        console.log(`Player ${player.color} surrendered in room ${socket.roomCode}`);
+
+        // End Game
+        room.gameConfig.active = false;
+        const winnerColor = player.color === 'red' ? 'Blue' : 'Red';
+        room.gameConfig.winner = winnerColor;
+
+        const stats = room.calculateStats();
+        const surrenderInfo = {
+            surrendered: true,
+            by: player.color === 'red' ? 'Red' : 'Blue',
+            type: 'surrender'
+        };
+
+        room.saveMatchRecord(stats, surrenderInfo);
+
+        io.to(socket.roomCode).emit('roomState', {
+            players: room.players,
+            config: room.gameConfig,
+            stats: stats
+        });
+
+        // Broadcast Game Over with Surrender info handling
+        io.to(socket.roomCode).emit('gameOver', {
+            winner: winnerColor,
+            surrender: surrenderInfo
+        });
+    });
+
     socket.on('action', (action) => {
         if (!socket.roomCode || !rooms[socket.roomCode]) return;
         const room = rooms[socket.roomCode];
@@ -612,6 +868,7 @@ io.on('connection', (socket) => {
 
         // Record surrender info
         const surrenderInfo = { surrendered: true, by: player.color === 'red' ? 'Red' : 'Blue' };
+        room.gameConfig.surrender = surrenderInfo;
 
         room.saveMatchRecord(stats, surrenderInfo);
         io.to(socket.roomCode).emit('state', { board: room.board, players: room.players, stats, config: room.gameConfig });
@@ -703,7 +960,7 @@ io.on('connection', (socket) => {
         if (!player) return;
         const chatMsg = { name: player.name, color: player.color, text: msg, time: Date.now() };
         room.chatMessages.push(chatMsg);
-        if (room.chatMessages.length > 20) room.chatMessages.shift();
+        if (room.chatMessages.length > 50) room.chatMessages.shift();
         io.to(socket.roomCode).emit('chatMessage', chatMsg);
     });
 
@@ -783,10 +1040,9 @@ io.on('connection', (socket) => {
                     }
                 }
 
-                // System Chat Message
                 const sysMsg = { name: '系统', color: 'system', text: `${p.name} 离开了房间`, time: Date.now() };
                 room.chatMessages.push(sysMsg);
-                if (room.chatMessages.length > 20) room.chatMessages.shift();
+                if (room.chatMessages.length > 50) room.chatMessages.shift();
                 io.to(oldRoom).emit('chatMessage', sysMsg);
             }
 

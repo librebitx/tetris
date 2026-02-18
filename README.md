@@ -1,35 +1,90 @@
-# 俄罗斯方块 (Tetris)
-一个允许两名玩家通过网络对战的俄罗斯方块游戏。
+# 多人在线俄罗斯方块 (Multiplayer Tetris)
 
-## 文档
-- [部署指南](DEPLOY.md)
-- [故障排除与日志](TROUBLESHOOTING.md)
+这是一个基于 Web 的实时多人对战俄罗斯方块游戏。支持创建房间、实时对战、聊天互动、历史记录查看等功能。
 
-## 项目结构
+## ✨ 主要功能
 
-以下是项目的主要文件和目录结构说明：
+- **实时对战**：支持双人在线对战，红蓝方对抗。
+- **房间系统**：
+  - 创建私人房间（6位邀请码）。
+  - 加入现有房间。
+  - 旁观模式（房间满员后自动成为观众）。
+- **游戏模式**：
+  - **分数模式**：先达到目标分数者获胜。
+  - **时间模式**：在规定时间内分数高者获胜。
+  - **区域占领**：背景包含不同大小的区域（8, 10, 12, 16格），填满区域可获得额外加分。
+- **聊天系统**：
+  - 实时聊天（支持滚动查看历史）。
+  - 自动同步历史消息（新加入玩家可见）。
+  - 系统消息提示（加入/离开/认输）。
+- **历史记录**：
+  - 自动保存对战结果。
+  - 支持查看历史对局详情（胜者、分数、时间）。
+  - 处理掉线/认输情况。
+- **移动端支持**：
+  - 针对手机优化的触摸控制布局。
+  - 自动检测设备类型。
+
+## 🛠️ 技术栈
+
+- **前端**：Vue 3, Vite, Socket.io Client
+- **后端**：Node.js, Socket.io
+- **部署**：Nginx (反向代理), PM2 (进程管理)
+
+## 📂 项目结构
 
 ```
 .
-├── DEPLOY.md               # 部署指南（中文）
-├── LICENSE                 # 许可证文件
-├── README.md               # 项目自述文件（中文）
-├── TROUBLESHOOTING.md      # 故障排除与日志指南（中文）
-├── push.sh                 # 推送代码脚本
-├── start_game.sh           # 启动游戏脚本（同时启动前后端）
-├── stop_game.sh            # 停止游戏脚本
-├── tetris-shared/          # 后端服务代码目录
-│   ├── server.js           # 后端服务器入口文件 (Node.js/Socket.io)
-│   ├── package.json        # 后端依赖配置
+├── tetris-shared/          # 后端服务
+│   ├── server.js           # 游戏服务器逻辑
+│   ├── history.json        # 历史记录数据
 │   └── ...
-└── tetris-vue/             # 前端应用代码目录 (Vue 3/Vite)
-    ├── index.html          # 前端入口 HTML
-    ├── package.json        # 前端依赖配置
-    ├── vite.config.js      # Vite 构建配置
-    ├── src/                # 前端源代码
-    │   ├── App.vue         # 根组件
-    │   ├── main.js         # 前端入口 JS
-    │   ├── components/     # Vue 组件 (Game.vue, Lobby.vue)
-    │   └── composables/    # 组合式函数 (useSocket.js)
-    └── ...
+├── tetris-vue/             # 前端应用
+│   ├── src/                # Vue 源代码
+│   ├── vite.config.js      # Vite 配置 (包含开发代理)
+│   └── ...
+├── start_game.sh           # 一键启动脚本 (开发/本地)
+├── stop_game.sh            # 停止脚本
+├── DEPLOY.md               # 服务器部署指南
+└── TROUBLESHOOTING.md      # 故障排查手册
 ```
+
+## 🚀 快速开始 (本地开发)
+
+1. **安装依赖**：
+   ```bash
+   # 后端
+   cd tetris-shared
+   npm install
+
+   # 前端
+   cd ../tetris-vue
+   npm install
+   ```
+
+2. **启动游戏**：
+   回到根目录运行启动脚本：
+   ```bash
+   ./start_game.sh
+   ```
+   该脚本会同时启动后端 (端口 3000) 和前端 (端口 5173)。
+
+3. **访问游戏**：
+   打开浏览器访问 [http://localhost:5173](http://localhost:5173)。
+
+4. **停止游戏**：
+   ```bash
+   ./stop_game.sh
+   ```
+
+## 📖 文档
+
+- **[部署指南 (DEPLOY.md)](DEPLOY.md)**：如何在 Linux 服务器上部署生产环境。
+- **[故障排除 (TROUBLESHOOTING.md)](TROUBLESHOOTING.md)**：常见问题解决方案和日志查看方法。
+
+## 📝 最近更新
+
+- 修复了历史记录在"Top Out"（方块溢出）时不保存的问题。
+- 优化了聊天室功能（支持滚动、历史同步）。
+- 增加了"平局"状态的处理。
+- 清理了项目中的冗余测试文件。
