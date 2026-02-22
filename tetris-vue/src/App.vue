@@ -42,28 +42,33 @@ const showGame = computed(() => {
 </script>
 
 <style>
-/* Global Toast Styles */
+/* Global Font Inheritance */
+button, input, select, textarea {
+  font-family: inherit;
+}
+
+/* Global Toast Styles - Retro Arcade Version */
 .global-toast {
   position: fixed;
   top: 20px;
   left: 50%;
   transform: translateX(-50%);
-  background-color: rgba(33, 33, 33, 0.95);
-  color: #fff;
+  background-color: #000;
+  color: #00ffff; /* Retro terminal green */
   padding: 12px 24px;
-  border-radius: 8px;
-  font-family: inherit;
-  font-size: 1rem;
+  border: 4px solid #00ffff;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 0.8rem;
   z-index: 10000;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
-  border: 1px solid #4ade80;
+  box-shadow: 4px 4px 0px rgba(0,255,255,0.3);
   pointer-events: none;
+  text-transform: uppercase;
 }
 
 /* Toast Transitions */
 .toast-fade-enter-active,
 .toast-fade-leave-active {
-  transition: all 0.3s ease;
+  transition: all 0.2s steps(4);
 }
 
 .toast-fade-enter-from,

@@ -20,6 +20,7 @@ const playerName = ref('');
 const controlSize = ref(100); // Percentage 50-200
 const chatMessages = reactive([]);
 const matchHistory = reactive([]);
+const leaderboard = reactive([]);
 const restartStatus = ref([]);
 
 const toastMessage = ref('');
@@ -104,6 +105,10 @@ export function useSocket() {
             matchHistory.splice(0, matchHistory.length, ...history);
         });
 
+        socket.value.on('leaderboard', (data) => {
+            leaderboard.splice(0, leaderboard.length, ...data);
+        });
+
         socket.value.on('restartStatus', (status) => {
             restartStatus.value = status;
         });
@@ -132,6 +137,12 @@ export function useSocket() {
     const joinSinglePlayer = () => {
         if (socket.value) {
             socket.value.emit('joinSinglePlayer');
+        }
+    };
+
+    const getLeaderboard = () => {
+        if (socket.value) {
+            socket.value.emit('getLeaderboard');
         }
     };
 
@@ -234,11 +245,13 @@ export function useSocket() {
         controlSize,
         chatMessages,
         matchHistory,
+        leaderboard,
         lobbyStats,
         restartStatus,
         requestRestart,
         toggleReady,
         joinSinglePlayer,
+        getLeaderboard,
         toastMessage,
         showToast
     };

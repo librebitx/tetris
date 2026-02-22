@@ -262,6 +262,14 @@ const timeValue = ref(3);
 const scoreValue = ref(200);
 const speedValue = ref(1);
 
+// Default to 1.5x speed for single player mode
+watch(currentRoom, (newRoom) => {
+    if (newRoom && newRoom.startsWith('SOLO')) {
+        speedValue.value = 1.5;
+        syncSettings();
+    }
+}, { immediate: true });
+
 const isGuestReady = computed(() => {
     if (!gameState.players) return false;
     const guest = Object.values(gameState.players).find(p => p.color === 'blue');
@@ -331,13 +339,30 @@ const handleLeaveConfirm = () => {
   flex-direction: column;
   align-items: center;
   min-height: 100vh;
+  min-height: 100svh;
   color: #ececec;
-  background: #212121;
+  background-color: #050505;
+  background-image: 
+    linear-gradient(rgba(0, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 255, 255, 0.03) 1px, transparent 1px);
+  background-size: 30px 30px;
   overflow-y: auto;
-  overflow-y: auto;
-  padding: 20px 0 40px;
+  padding: 16px 12px 40px;
   box-sizing: border-box;
-  justify-content: center;
+  justify-content: flex-start;
+  position: relative;
+}
+.lobby-container::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: radial-gradient(circle at center, transparent 40%, rgba(0,0,0,0.8) 100%);
+  pointer-events: none;
+  z-index: 0;
+}
+.lobby-card, .lobby-stats, h1 {
+  position: relative;
+  z-index: 1;
 }
 
 h1 {
@@ -348,15 +373,26 @@ h1 {
 }
 
 .lobby-card {
-  background: #2f2f2f;
-  border: 1px solid #424242;
+  background: #111;
+  border: 6px solid #444;
   padding: 16px;
-  border-radius: 12px;
+  border-radius: 0;
   text-align: center;
   width: 90%;
   max-width: 420px;
   box-sizing: border-box;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  box-shadow: 
+    inset 4px 4px 0 #000,
+    inset -4px -4px 0 #222,
+    8px 8px 0 #000;
+  position: relative;
+}
+.lobby-card::after {
+  content: '';
+  position: absolute;
+  top: 4px; left: 4px; right: 4px; bottom: 4px;
+  border: 2px dashed #333;
+  pointer-events: none;
 }
 
 .lobby-header {
@@ -369,25 +405,30 @@ h1 {
 
 .back-btn {
   position: absolute;
-  left: 0;
+  left: 12px;
   top: 50%;
   transform: translateY(-50%);
-  background: transparent;
-  border: none;
-  color: #b4b4b4;
-  font-size: 1.1em; /* Increased font */
-  padding: 12px 16px; /* Increased hit area */
+  background: #222;
+  border: 4px solid #555;
+  color: #fff;
+  font-size: 0.85em;
+  padding: 6px 12px;
+  font-family: inherit;
   cursor: pointer;
-  z-index: 100; /* Increased z-index */
+  z-index: 100;
+  box-shadow: 4px 4px 0 #000;
+  transition: all 0.1s;
+  border-radius: 0;
+  text-transform: uppercase;
 }
 .back-btn:hover {
-  color: #ececec;
-  background: rgba(255,255,255,0.1);
-  border-radius: 4px;
+  background: #555;
+  border-color: #00ffff;
+  color: #00ffff;
 }
 .back-btn:active {
-  transform: translateY(-50%) scale(0.95);
-  color: #10a37f;
+  transform: translateY(calc(-50% + 2px)) translateX(2px);
+  box-shadow: 2px 2px 0 #000;
 }
 
 .room-title {
@@ -423,50 +464,63 @@ h1 {
   padding: 12px;
   width: 100%;
   text-align: center;
-  letter-spacing: 0.2em;
   margin-bottom: 20px;
-  background: #212121;
-  border: 1px solid #424242;
-  border-radius: 8px;
-  color: #ececec;
+  background: #000;
+  border: 4px solid #424242;
+  border-radius: 0;
+  color: #00ffff;
   box-sizing: border-box;
+  text-transform: uppercase;
 }
 .room-input:focus {
-  outline: 2px solid #10a37f;
-  border-color: #10a37f;
+  outline: none;
+  border-color: #00ffff;
+  box-shadow: 4px 4px 0 #00ffff;
 }
 
 .primary-btn {
   width: 100%;
   padding: 12px;
   font-size: 1.1em;
-  background: #10a37f;
-  border: none;
-  font-weight: 600;
+  background: #0088cc;
+  border: 4px solid #fff;
+  font-family: 'Press Start 2P', monospace;
   color: white;
-  border-radius: 8px;
+  border-radius: 0;
+  text-transform: uppercase;
+  cursor: pointer;
+  box-shadow: 4px 4px 0 #00ffff;
 }
 .primary-btn:hover {
-  background: #1a7f64;
+  background: #fff;
+  color: #000;
+  border-color: #00ffff;
 }
 .primary-btn:disabled {
-  background: #424242;
-  color: #888;
+  background: #222;
+  color: #555;
+  border-color: #444;
+  box-shadow: none;
   cursor: not-allowed;
 }
 
 .ready-btn {
-  background: #10a37f;
+  background: #0088cc;
+  border-color: #00ffff;
 }
 .ready-btn:hover {
-  background: #1a7f64;
+  background: #00ffff;
+  color: #000;
 }
 
 .cancel-btn {
   background: #d32f2f;
+  border-color: #ff0000;
+  box-shadow: 4px 4px 0 #ff0000;
 }
 .cancel-btn:hover {
-  background: #b71c1c;
+  background: #ff0000;
+  color: #000;
 }
 
 .rules-section {
@@ -488,7 +542,7 @@ h1 {
   line-height: 1.6;
 }
 .rules-list b {
-  color: #10a37f;
+  color: #00ffff;
 }
 
 
@@ -496,9 +550,9 @@ h1 {
 .lobby-stats {
   margin-top: 16px;
   padding: 12px;
-  background: #252525;
-  border-radius: 8px;
-  border: 1px solid #333;
+  background: #000;
+  border-radius: 0;
+  border: 4px solid #333;
 }
 .stat-item {
   display: flex;
@@ -510,9 +564,9 @@ h1 {
 }
 .stat-item:last-child { margin-bottom: 0; }
 .stat-value {
-  color: #10a37f;
+  color: #00ffff;
   font-weight: bold;
-  font-family: monospace;
+  font-family: inherit;
   font-size: 1.1em;
 }
 .stat-value.empty {
@@ -542,8 +596,8 @@ h1 {
 }
 .room-tag:hover {
   background: #444;
-  border-color: #10a37f;
-  color: #10a37f;
+  border-color: #00ffff;
+  color: #00ffff;
 }
 
 /* Settings */
@@ -556,10 +610,10 @@ h1 {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: #212121;
+  background: #000;
   padding: 8px 12px;
-  border-radius: 8px;
-  border: 1px solid #424242;
+  border-radius: 0;
+  border: 4px solid #444;
 }
 .radio-label {
   display: flex;
@@ -596,24 +650,24 @@ h1 {
   flex: 1;
   text-align: center;
   padding: 8px;
-  background: #2f2f2f;
-  border: 1px solid #424242;
-  border-radius: 6px;
+  background: #000;
+  border: 4px solid #424242;
+  border-radius: 0;
   cursor: pointer;
-  font-size: 0.9em;
+  font-size: 0.8em;
   color: #b4b4b4;
-  transition: all 0.2s;
+  transition: all 0.1s;
 }
 .speed-chip.active {
-  background: #2a4b40;
-  border-color: #10a37f;
-  color: #10a37f;
-  font-weight: 600;
+  background: #111;
+  border-color: #00ffff;
+  color: #00ffff;
+  box-shadow: 2px 2px 0 #00ffff;
 }
 .speed-chip input { display: none; }
 
 .wait-hint {
-  color: #10a37f;
+  color: #00a2ed;
   font-size: 0.95em;
   margin: 8px 0;
   animation: pulse 2s infinite;
@@ -641,7 +695,7 @@ h1 {
   margin: 4px 0;
 }
 .board-size-hint {
-  color: #10a37f;
+  color: #00a2ed;
   font-size: 0.8em;
   margin-top: 8px;
 }
@@ -673,7 +727,7 @@ h1 {
   font-size: 0.8em;
 }
 .slider-h {
-  accent-color: #10a37f;
+  accent-color: #00a2ed;
   width: 100px;
 }
 
@@ -685,17 +739,25 @@ h1 {
   margin-top: 10px;
 }
 .chat-btn {
-  background: #212121;
-  border: 1px solid #424242;
-  color: #b4b4b4;
-  font-size: 0.9em;
-  padding: 6px 16px;
-  border-radius: 6px;
+  background: #222;
+  border: 4px solid #555;
+  color: #fff;
+  font-size: 0.85em;
+  padding: 6px 12px;
+  border-radius: 0;
+  box-shadow: 2px 2px 0 #000;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.1s;
 }
 .chat-btn:hover {
-  background: #333;
-  color: #ececec;
-  border-color: #666;
+  background: #555;
+  color: #00ffff;
+  border-color: #00ffff;
+}
+.chat-btn:active {
+  transform: translate(2px, 2px);
+  box-shadow: 0 0 0 #000;
 }
 
 /* Chat Log */
@@ -739,18 +801,20 @@ h1 {
 .history-toggle-text {
   background: none;
   border: none;
-  color: #10a37f;
+  color: #00a2ed;
   cursor: pointer;
   font-size: 0.9em;
 }
 .history-card {
-  background: #3a3a3a;
-  border-radius: 8px;
+  background: #111;
+  border-radius: 0;
+  border: 4px solid #444;
   padding: 10px 12px;
   margin-bottom: 8px;
   display: flex;
   flex-direction: column;
   gap: 6px;
+  box-shadow: inset 4px 4px 0 #000;
 }
 
 .h-top {
@@ -891,19 +955,27 @@ h1 {
   width: 100%;
 }
 .secondary-btn {
-  background: transparent;
-  border: 1px solid #424242;
-  color: #b4b4b4;
-  padding: 10px;
+  background: #222;
+  border: 4px solid #888;
+  color: #fff;
+  padding: 12px;
   width: 100%;
-  border-radius: 8px;
+  border-radius: 0;
   cursor: pointer;
-  font-size: 1em;
+  font-size: 1.1em;
+  font-family: inherit;
+  text-transform: uppercase;
+  box-shadow: 4px 4px 0 #000;
+  transition: all 0.1s;
 }
 .secondary-btn:hover {
-  background: #3a3a3a;
-  color: #ececec;
-  border-color: #666;
+  background: #888;
+  color: #000;
+  border-color: #fff;
+}
+.secondary-btn:active {
+  transform: translate(2px, 2px);
+  box-shadow: 2px 2px 0 #000;
 }
 
 /* Modal Overlay */
@@ -922,15 +994,26 @@ h1 {
 }
 
 .modal-content {
-  background: #2f2f2f;
+  background: #111;
   width: 90%;
-  max-width: 400px;
-  border-radius: 12px;
+  max-width: 440px;
+  border-radius: 0;
+  border: 6px solid #444;
   max-height: 80vh;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 5px 20px rgba(0,0,0,0.5);
-  border: 1px solid #424242;
+  box-shadow: 
+    inset 4px 4px 0 #000,
+    inset -4px -4px 0 #222,
+    8px 8px 0 #000;
+  position: relative;
+}
+.modal-content::after {
+  content: '';
+  position: absolute;
+  top: 4px; left: 4px; right: 4px; bottom: 4px;
+  border: 2px dashed #333;
+  pointer-events: none;
 }
 
 .modal-header {
@@ -938,25 +1021,40 @@ h1 {
   justify-content: space-between;
   align-items: center;
   padding: 16px;
-  border-bottom: 1px solid #424242;
+  border-bottom: 4px solid #333;
+  position: relative;
+  z-index: 2;
 }
 
 .modal-header h3 {
   margin: 0;
-  font-size: 1.1em;
-  color: #ececec;
+  font-size: 1.2em;
+  color: #00ffff;
+  text-shadow: 2px 2px 0 #000;
 }
 
 .close-btn {
-  background: none;
-  border: none;
+  background: #d32f2f;
+  border: 2px solid #ff0000;
   font-size: 1.5em;
-  color: #b4b4b4;
+  color: #fff;
   cursor: pointer;
   line-height: 1;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 2px 2px 0 #000;
+  border-radius: 0;
 }
 .close-btn:hover {
-  color: #fff;
+  background: #ff0000;
+  color: #000;
+}
+.close-btn:active {
+  transform: translate(2px, 2px);
+  box-shadow: 0 0 0 #000;
 }
 
 .history-list-modal {
@@ -976,4 +1074,15 @@ h1 {
   font-size: 0.9em;
 }
 
+/* ===== Responsive Mobile ===== */
+@media (max-width: 480px) {
+  .lobby-container { padding: 12px 8px 32px; }
+  h1 { font-size: 0.85em; margin-bottom: 14px; }
+  .lobby-card { padding: 10px; border-width: 4px; }
+  .room-input { font-size: 0.75em; padding: 10px 8px; }
+  .primary-btn { font-size: 0.8em; padding: 10px; }
+  .secondary-btn { font-size: 0.75em; padding: 8px; }
+  .rules-list { font-size: 0.7em; line-height: 1.5; }
+  .chat-btn { font-size: 0.6em; padding: 4px 6px; }
+}
 </style>

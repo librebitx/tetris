@@ -44,108 +44,154 @@ const selectMultiplayer = () => {
   align-items: center;
   justify-content: center;
   min-height: 100vh;
-  background-color: #121212;
+  min-height: 100svh;
+  overflow-y: auto;
+  background-color: #050505;
+  background-image: 
+    linear-gradient(rgba(0, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 255, 255, 0.03) 1px, transparent 1px);
+  background-size: 30px 30px;
   color: white;
-  padding: 2rem;
-  font-family: 'Inter', system-ui, Avenir, Helvetica, Arial, sans-serif;
+  padding: 2rem 1rem;
+  box-sizing: border-box;
+  position: relative;
+}
+.mode-select-container::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: radial-gradient(circle at center, transparent 40%, rgba(0,0,0,0.8) 100%);
+  pointer-events: none;
+  z-index: 0;
+}
+.title-section, .modes-wrapper {
+  position: relative;
+  z-index: 1;
 }
 
 .title-section {
   text-align: center;
   margin-bottom: 4rem;
-  animation: fadeInDown 0.8s ease-out;
+  animation: fadeInDown 0.8s steps(4);
 }
 
 .main-title {
-  font-size: 3rem;
+  font-size: 2.5rem;
   margin: 0;
-  background: linear-gradient(45deg, #4ade80, #3b82f6);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  text-shadow: 0 4px 15px rgba(59, 130, 246, 0.3);
+  color: #ffff00; /* Arcade Yellow */
+  text-shadow: 4px 4px 0px #ff0000; /* Blocky 8-bit shadow */
+  text-transform: uppercase;
+  letter-spacing: 2px;
 }
 
 .subtitle {
-  font-size: 1.2rem;
-  color: #a0a0a0;
-  margin-top: 0.5rem;
+  font-size: 1rem;
+  color: #00ffff; /* Terminal Green */
+  margin-top: 1rem;
+  text-transform: uppercase;
 }
 
 .modes-wrapper {
   display: flex;
-  gap: 2rem;
+  gap: 3rem;
   flex-wrap: wrap;
   justify-content: center;
 }
 
 .mode-card {
   position: relative;
-  background: #1e1e1e;
-  border: 1px solid #333;
-  border-radius: 16px;
-  width: 260px;
-  padding: 2.5rem 1.5rem;
+  background: #111;
+  border: 6px solid #444;
+  width: 280px;
+  padding: 3rem 1.5rem;
   text-align: center;
   cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+  transition: all 0.1s;
   overflow: hidden;
-  animation: fadeInUp 0.8s ease-out;
+  animation: fadeInUp 0.8s steps(4);
+  box-shadow: 
+    inset 4px 4px 0 #000,
+    inset -4px -4px 0 #222,
+    8px 8px 0 #000;
 }
 
-.mode-card::before {
+.mode-card::after {
   content: '';
   position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0) 100%);
-  z-index: 1;
+  top: 4px;
+  left: 4px;
+  right: 4px;
+  bottom: 4px;
+  border: 2px dashed #333;
   pointer-events: none;
 }
 
 .mode-card:hover {
-  transform: translateY(-8px);
-  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.4);
-  border-color: #555;
+  transform: translate(-4px, -4px);
+  background: #1a1a1a;
 }
 
 .mode-card:active {
-  transform: translateY(-2px);
+  transform: translate(2px, 2px);
+  box-shadow: 
+    inset 4px 4px 0 #000,
+    inset -4px -4px 0 #222,
+    2px 2px 0 #000;
 }
 
 .card-icon {
-  font-size: 4rem;
+  font-size: 4.5rem;
   margin-bottom: 1rem;
   position: relative;
   z-index: 2;
+  text-shadow: 4px 4px 0 #000;
 }
 
 .card-title {
   font-size: 1.5rem;
-  margin: 0 0 0.5rem 0;
+  margin: 0 0 0.8rem 0;
   color: #fff;
   position: relative;
   z-index: 2;
+  text-transform: uppercase;
 }
 
 .card-desc {
-  font-size: 0.9rem;
+  font-size: 1rem;
   color: #888;
   margin: 0;
   position: relative;
   z-index: 2;
+  line-height: 1.4;
 }
 
 /* Specific Card Styles */
+.multiplayer {
+  border-color: #0088cc;
+}
 .multiplayer:hover {
-  border-color: #3b82f6;
-  box-shadow: 0 12px 30px rgba(59, 130, 246, 0.2);
+  border-color: #00ffff;
+  box-shadow: 
+    inset 4px 4px 0 #000,
+    inset -4px -4px 0 #222,
+    12px 12px 0 #005580;
+}
+.multiplayer .card-title {
+  color: #00ffff;
 }
 
+.single-player {
+  border-color: #008800;
+}
 .single-player:hover {
-  border-color: #4ade80;
-  box-shadow: 0 12px 30px rgba(74, 222, 128, 0.2);
+  border-color: #00ffff;
+  box-shadow: 
+    inset 4px 4px 0 #000,
+    inset -4px -4px 0 #222,
+    12px 12px 0 #005500;
+}
+.single-player .card-title {
+  color: #00ffff;
 }
 
 .coming-soon-badge {
@@ -189,15 +235,33 @@ const selectMultiplayer = () => {
 @media (max-width: 600px) {
   .modes-wrapper {
     flex-direction: column;
+    gap: 1.5rem;
   }
   
   .mode-card {
-    width: 240px;
+    width: 90%;
+    max-width: 320px;
     padding: 2rem 1rem;
   }
 
-  .main-title {
-    font-size: 2.2rem;
+  .card-icon {
+    font-size: 3rem;
   }
+
+  .main-title {
+    font-size: 1.6rem;
+  }
+
+  .title-section {
+    margin-bottom: 2rem;
+  }
+}
+
+@media (max-width: 380px) {
+  .main-title { font-size: 1.2rem; }
+  .subtitle { font-size: 0.75rem; }
+  .card-title { font-size: 1.1rem; }
+  .card-desc { font-size: 0.8rem; }
+  .mode-card { padding: 1.5rem 0.8rem; }
 }
 </style>

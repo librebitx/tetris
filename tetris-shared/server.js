@@ -30,11 +30,14 @@ const SHAPES = [
 const fs = require('fs');
 const path = require('path');
 const HISTORY_FILE = path.join(__dirname, 'history.json');
+const LEADERBOARD_FILE = path.join(__dirname, 'leaderboard.json');
 
 // Room Management
 const rooms = {}; // roomCode -> Room Instance
 let matchHistory = []; // Global recent match records (max 50)
 const MAX_HISTORY = 50;
+let topScores = []; // Top 10 Single Player Leaderboard
+const MAX_LEADERBOARD = 10;
 
 // Load history on start
 try {
@@ -48,11 +51,31 @@ try {
     matchHistory = [];
 }
 
+// Load leaderboard on start
+try {
+    if (fs.existsSync(LEADERBOARD_FILE)) {
+        const data = fs.readFileSync(LEADERBOARD_FILE, 'utf8');
+        topScores = JSON.parse(data);
+        console.log(`Loaded ${topScores.length} leaderboard records.`);
+    }
+} catch (e) {
+    console.error('Failed to load leaderboard:', e);
+    topScores = [];
+}
+
 function saveHistoryToFile() {
     try {
         fs.writeFileSync(HISTORY_FILE, JSON.stringify(matchHistory, null, 2));
     } catch (e) {
         console.error('Failed to save history:', e);
+    }
+}
+
+function saveLeaderboardToFile() {
+    try {
+        fs.writeFileSync(LEADERBOARD_FILE, JSON.stringify(topScores, null, 2));
+    } catch (e) {
+        console.error('Failed to save leaderboard:', e);
     }
 }
 
@@ -172,13 +195,14 @@ class Room {
     constructor(code, isSinglePlayer = false) {
         this.code = code;
         this.isSinglePlayer = isSinglePlayer;
-        this.rows = DEFAULT_SIZE;
-        this.cols = DEFAULT_SIZE;
+        this.rows = isSinglePlayer ? 30 : DEFAULT_SIZE;
+        this.cols = isSinglePlayer ? 30 : DEFAULT_SIZE;
         this.board = Array(this.rows).fill().map(() => Array(this.cols).fill(0));
         this.players = {}; // socket.id -> { id, color, piece, name }
         this.playerBags = {};
         this.gameInterval = null;
         this.chatMessages = []; // Quick chat messages
+        this.scoreLogs = []; // Stores scoring events { timestamp, playerName, action, points, color }
         this.gameConfig = {
             mode: 'score', // Default
             value: 200,    // Default
@@ -192,6 +216,16 @@ class Room {
         this.gameConfig.bgRects = generateTiling(this.rows, this.cols);
     }
 
+    addScoreLog(playerName, action, points, color) {
+        this.scoreLogs.push({
+            timestamp: Date.now(),
+            playerName,
+            action,
+            points,
+            color
+        });
+    }
+
     getNextPiece(playerId) {
         if (!this.playerBags[playerId] || this.playerBags[playerId].length === 0) {
             let bag = [0, 1, 2, 3, 4, 5, 6];
@@ -203,6 +237,8 @@ class Room {
         }
         return this.playerBags[playerId].pop();
     }
+
+    // Removed Edge Match shape generation routines per user request
 
     spawnPiece(playerColor, playerId) {
         let shapeIdx;
@@ -338,7 +374,7 @@ class Room {
                     const newX = piece.x + c + dx;
                     const newY = piece.y + r + dy;
                     if (newX < 0 || newX >= this.cols || newY < 0 || newY >= this.rows) return false;
-                    if (this.board[newY][newX]) return false;
+                    if (!this.board || !this.board[newY] || this.board[newY][newX] !== 0) return false;
                 }
             }
         }
@@ -353,6 +389,8 @@ class Room {
         const piece = player.piece;
         if (!piece) return;
 
+        const preStats = this.calculateStats();
+
         for (let r = 0; r < piece.shape.length; r++) {
             for (let c = 0; c < piece.shape[r].length; c++) {
                 if (piece.shape[r][c]) {
@@ -364,6 +402,8 @@ class Room {
                 }
             }
         }
+
+        // Edge Match Target Check removed per user request
 
         // Clear Rows
         for (let r = this.rows - 1; r >= 0; r--) {
@@ -382,6 +422,15 @@ class Room {
                     this.board[r][c] = 0;
                 }
             }
+        }
+
+        const postStats = this.calculateStats();
+
+        // Log territory capture points
+        if (player.color === 'red' && postStats.redScore > preStats.redScore) {
+            this.addScoreLog(player.name || '红方', '占领区域', postStats.redScore - preStats.redScore, 'red');
+        } else if (player.color === 'blue' && postStats.blueScore > preStats.blueScore) {
+            this.addScoreLog(player.name || '蓝方', '占领区域', postStats.blueScore - preStats.blueScore, 'blue');
         }
 
         // Respawn — check if spawn zone is blocked
@@ -403,10 +452,12 @@ class Room {
         let redCount = 0;
         let blueCount = 0;
         let total = 0;
-        let redScore = 0;
-        let blueScore = 0;
 
-        // 1. Basic Cell Counting & Perimeter Score
+        // Base score starts with bonus displays (accumulated from edge targets)
+        let redScore = this.gameConfig?.redBonusDisplay || 0;
+        let blueScore = this.gameConfig?.blueBonusDisplay || 0;
+
+        // 1. Basic Cell Counting
         for (let r = 0; r < this.rows; r++) {
             for (let c = 0; c < this.cols; c++) {
                 const val = this.board[r][c];
@@ -414,12 +465,6 @@ class Room {
                     total++;
                     if (val === 1) redCount++;
                     else if (val === 2) blueCount++;
-
-                    // Perimeter Scoring
-                    if (r === 0 || r === this.rows - 1 || c === 0 || c === this.cols - 1) {
-                        if (val === 1) redScore += 5;
-                        else if (val === 2) blueScore += 5;
-                    }
                 }
             }
         }
@@ -511,9 +556,9 @@ class Room {
                     });
                 }
 
-                io.to(this.code).emit('state', { board: this.board, players: this.players, stats, config: this.gameConfig });
+                io.to(this.code).emit('state', { board: this.board, players: this.players, stats, config: this.gameConfig, scoreLogs: this.scoreLogs });
             } else {
-                io.to(this.code).emit('state', { board: this.board, players: this.players, stats: this.calculateStats(), config: this.gameConfig });
+                io.to(this.code).emit('state', { board: this.board, players: this.players, stats: this.calculateStats(), config: this.gameConfig, scoreLogs: this.scoreLogs });
             }
         }, tickRate);
     }
@@ -525,14 +570,15 @@ class Room {
             this.gameInterval = null;
         }
 
-        // Dynamic board size: time ≤ 3min or score < 200 → 20×20, else 40×40
+        // Dynamic board size: time ≤ 3min or score < 200 → 20×20, else 40×40 
+        // Solo mode always gets 30x30
         const val = parseInt(config.value);
-        if ((config.mode === 'time' && val <= 180) || (config.mode === 'score' && val < 200)) {
+        if (!this.isSinglePlayer && ((config.mode === 'time' && val <= 180) || (config.mode === 'score' && val < 200))) {
             this.rows = 20;
             this.cols = 20;
         } else {
-            this.rows = DEFAULT_SIZE;
-            this.cols = DEFAULT_SIZE;
+            this.rows = this.isSinglePlayer ? 30 : DEFAULT_SIZE;
+            this.cols = this.isSinglePlayer ? 30 : DEFAULT_SIZE;
         }
 
         this.board = Array(this.rows).fill().map(() => Array(this.cols).fill(0));
@@ -553,8 +599,11 @@ class Room {
             winner: null,
             surrender: null, // Reset surrender
             boardSize: this.rows,
-            bgRects: generateTiling(this.rows, this.cols)
+            bgRects: generateTiling(this.rows, this.cols),
+            redBonusDisplay: 0,
+            blueBonusDisplay: 0
         };
+        this.scoreLogs = []; // Reset logs for the fresh match
         this.restartRequests = new Set(); // Track colors requesting restart
         this.startGameLoop();
     }
@@ -581,6 +630,24 @@ class Room {
 
         saveHistoryToFile();
 
+        // Single Player Leaderboard update
+        if (this.isSinglePlayer) {
+            topScores.push({
+                name: redPlayer?.name || '???',
+                score: stats.redScore,
+                time: new Date().toISOString(),
+                board: this.board.map(row => [...row]),
+                boardSize: this.rows,
+                bgRects: this.gameConfig.bgRects || []
+            });
+            topScores.sort((a, b) => b.score - a.score);
+            if (topScores.length > MAX_LEADERBOARD) {
+                topScores = topScores.slice(0, MAX_LEADERBOARD);
+            }
+            saveLeaderboardToFile();
+            io.emit('leaderboard', topScores); // Broadcast new leaderboard
+        }
+
         // Broadcast updated history to everyone (Lobby + Rooms)
         io.emit('matchHistory', matchHistory.slice(0, 10));
     }
@@ -602,7 +669,12 @@ io.on('connection', (socket) => {
     // Initial event to confirm connection
     socket.emit('connected');
     socket.emit('matchHistory', matchHistory.slice(0, 10));
+    socket.emit('leaderboard', topScores);
     broadcastLobbyStats();
+
+    socket.on('getLeaderboard', () => {
+        socket.emit('leaderboard', topScores);
+    });
 
     socket.on('joinSinglePlayer', () => {
         const roomCode = 'SOLO' + generateRandomLetters(2);
@@ -852,14 +924,28 @@ io.on('connection', (socket) => {
         } else if (action === 'drop') {
             const dx = player.piece.gravDx || 0;
             const dy = player.piece.gravDy || 0;
-            while (room.isValidMove(player.piece, dx, dy)) {
-                player.piece.x += dx;
-                player.piece.y += dy;
+
+            // Safeguard against infinite loops if gravity vector is broken
+            if (dx === 0 && dy === 0) {
+                console.warn(`[WARNING] Player ${player.color} has 0,0 gravity vector!`);
+                room.lockPiece(player);
+            } else {
+                let steps = 0;
+                while (room.isValidMove(player.piece, dx, dy)) {
+                    player.piece.x += dx;
+                    player.piece.y += dy;
+                    steps++;
+                    // Prevent infinite loop from taking down server
+                    if (steps > 100) {
+                        console.error(`[CRITICAL] Infinite loop detected in drop for player ${player.color} in room ${socket.roomCode}. Breaking.`);
+                        break;
+                    }
+                }
+                room.lockPiece(player);
             }
-            room.lockPiece(player);
         }
 
-        io.to(socket.roomCode).emit('state', { board: room.board, players: room.players, stats: room.calculateStats(), config: room.gameConfig });
+        io.to(socket.roomCode).emit('state', { board: room.board, players: room.players, stats: room.calculateStats(), config: room.gameConfig, scoreLogs: room.scoreLogs });
     });
 
     // Surrender
@@ -879,7 +965,7 @@ io.on('connection', (socket) => {
         room.gameConfig.surrender = surrenderInfo;
 
         room.saveMatchRecord(stats, surrenderInfo);
-        io.to(socket.roomCode).emit('state', { board: room.board, players: room.players, stats, config: room.gameConfig });
+        io.to(socket.roomCode).emit('state', { board: room.board, players: room.players, stats, config: room.gameConfig, scoreLogs: room.scoreLogs });
     });
 
     // Request Restart (Guest or Host signals readiness)
@@ -924,7 +1010,8 @@ io.on('connection', (socket) => {
                 board: room.board,
                 players: room.players,
                 stats: room.calculateStats(),
-                config: room.gameConfig
+                config: room.gameConfig,
+                scoreLogs: room.scoreLogs
             });
         }
     });
@@ -957,7 +1044,7 @@ io.on('connection', (socket) => {
             playerCount: Object.keys(room.players).length
         });
         // Also emit state to clear board on clients currently in game view (though they will switch to lobby)
-        io.to(socket.roomCode).emit('state', { board: room.board, players: room.players, stats: room.calculateStats(), config: room.gameConfig });
+        io.to(socket.roomCode).emit('state', { board: room.board, players: room.players, stats: room.calculateStats(), config: room.gameConfig, scoreLogs: room.scoreLogs });
     });
 
     // Quick Chat
@@ -997,7 +1084,7 @@ io.on('connection', (socket) => {
                         room.saveMatchRecord(stats, surrenderInfo);
 
                         // Notify Blue (state update before reset)
-                        io.to(blueId).emit('state', { board: room.board, players: room.players, stats, config: room.gameConfig });
+                        io.to(blueId).emit('state', { board: room.board, players: room.players, stats, config: room.gameConfig, scoreLogs: room.scoreLogs });
                     }
 
                     if (blueId) {
@@ -1030,7 +1117,7 @@ io.on('connection', (socket) => {
                         room.saveMatchRecord(stats, surrenderInfo);
 
                         // Notify Red (state update before reset)
-                        io.to(redId).emit('state', { board: room.board, players: room.players, stats, config: room.gameConfig });
+                        io.to(redId).emit('state', { board: room.board, players: room.players, stats, config: room.gameConfig, scoreLogs: room.scoreLogs });
                     }
 
                     if (redId) {
@@ -1095,7 +1182,7 @@ io.on('connection', (socket) => {
                         room.saveMatchRecord(stats, surrenderInfo);
 
                         // Notify Blue (state update before reset)
-                        io.to(blueId).emit('state', { board: room.board, players: room.players, stats, config: room.gameConfig });
+                        io.to(blueId).emit('state', { board: room.board, players: room.players, stats, config: room.gameConfig, scoreLogs: room.scoreLogs });
                     }
 
                     if (blueId) {
@@ -1128,7 +1215,7 @@ io.on('connection', (socket) => {
                         room.saveMatchRecord(stats, surrenderInfo);
 
                         // Notify Red (state update before reset)
-                        io.to(redId).emit('state', { board: room.board, players: room.players, stats, config: room.gameConfig });
+                        io.to(redId).emit('state', { board: room.board, players: room.players, stats, config: room.gameConfig, scoreLogs: room.scoreLogs });
                     }
 
                     if (redId) {

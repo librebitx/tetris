@@ -45,7 +45,7 @@ onUnmounted(() => {
   left: 0;
   width: 100vw;
   height: 100vh;
-  background-color: #1a1a1a;
+  background-color: #000;
   color: #fff;
   display: flex;
   justify-content: center;
@@ -58,7 +58,7 @@ onUnmounted(() => {
 .advice-container {
   text-align: center;
   padding: 2rem;
-  font-family: monospace;
+  font-family: inherit;
   font-size: 1.2rem;
   line-height: 2;
   color: #a0a0a0;

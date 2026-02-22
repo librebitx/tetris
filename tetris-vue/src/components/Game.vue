@@ -1,109 +1,102 @@
 <template>
   <div class="game-container">
-    <!-- Top 70%: Board Zone -->
-    <div class="board-zone">
-      <div v-if="gameState.config?.winner && !isReviewing" class="overlay">
-        <div class="overlay-card">
-          <!-- Single Player Result -->
-          <div v-if="isSolo" class="result-card solo-result">
+
+    <!-- ===== FULL-SCREEN GAME OVER OVERLAY ===== -->
+    <div v-if="gameState.config?.winner && !isReviewing" class="overlay">
+      <div class="overlay-card">
+        <!-- Single Player Result -->
+        <div v-if="isSolo" class="result-card solo-result">
+          <div class="h-top">
+            <span class="h-winner-tag t-red">挑战结束</span>
+          </div>
+          <div class="solo-score-row">
+            <span class="solo-label">最终得分</span>
+            <span class="solo-value">{{ gameState.stats.redScore }}</span>
+          </div>
+        </div>
+
+        <!-- Multiplayer Result -->
+        <div v-else class="result-card">
             <div class="h-top">
-              <span class="h-mode-tag">单人限时</span>
-              <span class="h-winner-tag t-red">挑战结束</span>
+                <span class="h-mode-tag">{{ gameState.config.mode === 'time' ? '限时' : '积分' }}</span>
+                <span class="h-winner-tag" :class="gameState.config.winner === 'Red' ? 't-red' : (gameState.config.winner === 'Blue' ? 't-blue' : 't-draw')">
+                    {{ gameState.config.winner === 'Red' ? '红方获胜' : (gameState.config.winner === 'Blue' ? '蓝方获胜' : '平局') }}
+                </span>
             </div>
-            <div class="solo-score-row">
-              <span class="solo-label">最终得分</span>
-              <span class="solo-value">{{ gameState.stats.redScore }}</span>
+            <div class="h-main-row">
+                 <!-- Red Side -->
+                 <div class="h-player-side side-left" :class="{ 'is-win': gameState.config.winner === 'Red' }">
+                     <div class="h-info-group">
+                         <div class="h-dot-row">
+                             <span class="h-dot red"></span>
+                             <span v-if="gameState.config.surrender?.by === 'Red'" class="surrender-mini-tag">
+                                 {{ gameState.config.surrender.type === 'disconnect' ? '逃跑' : '认输' }}
+                             </span>
+                         </div>
+                         <span class="h-name">{{ getPlayerName('red') }}</span>
+                     </div>
+                     <span class="h-score-num">{{ gameState.stats.redScore }}</span>
+                 </div>
+                 
+                 <div class="h-vs">VS</div>
+                 
+                 <!-- Blue Side -->
+                 <div class="h-player-side side-right" :class="{ 'is-win': gameState.config.winner === 'Blue' }">
+                     <span class="h-score-num">{{ gameState.stats.blueScore }}</span>
+                     <div class="h-info-group">
+                         <div class="h-dot-row">
+                             <span v-if="gameState.config.surrender?.by === 'Blue'" class="surrender-mini-tag surrender-left">
+                                 {{ gameState.config.surrender.type === 'disconnect' ? '逃跑' : '认输' }}
+                             </span>
+                             <span class="h-dot blue"></span>
+                         </div>
+                         <span class="h-name">{{ getPlayerName('blue') }}</span>
+                     </div>
+                 </div>
             </div>
-          </div>
+        </div>
+        
+        <!-- Restart Status (Multiplayer only) -->
+        <div v-if="!isSolo" class="restart-status-row">
+           <div class="status-pill red" :class="{ ready: isRedReady }">
+               <span class="dot"></span> {{ isRedReady ? '红方就绪' : '红方等待' }}
+           </div>
+           <div class="status-pill blue" :class="{ ready: isBlueReady }">
+               <span class="dot"></span> {{ isBlueReady ? '蓝方就绪' : '蓝方等待' }}
+           </div>
+        </div>
 
-          <!-- History Style Score Card (Multiplayer) -->
-          <div v-else class="result-card">
-              <div class="h-top">
-                  <span class="h-mode-tag">{{ gameState.config.mode === 'time' ? '限时' : '积分' }}</span>
-                  <span class="h-winner-tag" :class="gameState.config.winner === 'Red' ? 't-red' : (gameState.config.winner === 'Blue' ? 't-blue' : 't-draw')">
-                      {{ gameState.config.winner === 'Red' ? '红方获胜' : (gameState.config.winner === 'Blue' ? '蓝方获胜' : '平局') }}
-                  </span>
-              </div>
-              <div class="h-main-row">
-                   <!-- Red Side -->
-                   <div class="h-player-side side-left" :class="{ 'is-win': gameState.config.winner === 'Red' }">
-                       <div class="h-info-group">
-                           <div class="h-dot-row">
-                               <span class="h-dot red"></span>
-                               <span v-if="gameState.config.surrender?.by === 'Red'" class="surrender-mini-tag">
-                                   {{ gameState.config.surrender.type === 'disconnect' ? '逃跑' : '认输' }}
-                               </span>
-                           </div>
-                           <span class="h-name">{{ getPlayerName('red') }}</span>
-                       </div>
-                       <span class="h-score-num">{{ gameState.stats.redScore }}</span>
-                   </div>
-                   
-                   <div class="h-vs">VS</div>
-                   
-                   <!-- Blue Side -->
-                   <div class="h-player-side side-right" :class="{ 'is-win': gameState.config.winner === 'Blue' }">
-                       <span class="h-score-num">{{ gameState.stats.blueScore }}</span>
-                       <div class="h-info-group">
-                           <div class="h-dot-row">
-                               <span v-if="gameState.config.surrender?.by === 'Blue'" class="surrender-mini-tag surrender-left">
-                                   {{ gameState.config.surrender.type === 'disconnect' ? '逃跑' : '认输' }}
-                               </span>
-                               <span class="h-dot blue"></span>
-                           </div>
-                           <span class="h-name">{{ getPlayerName('blue') }}</span>
-                       </div>
-                   </div>
-              </div>
-          </div>
-          
-          <!-- Restart Status -->
-          <div v-if="!isSolo" class="restart-status-row">
-             <div class="status-pill red" :class="{ ready: isRedReady }">
-                 <span class="dot"></span> {{ isRedReady ? '红方就绪' : '红方等待' }}
-             </div>
-             <div class="status-pill blue" :class="{ ready: isBlueReady }">
-                 <span class="dot"></span> {{ isBlueReady ? '蓝方就绪' : '蓝方等待' }}
-             </div>
-          </div>
+        <!-- Action Buttons -->
+        <div class="restart-actions">
+          <button v-if="isSolo" class="restart-btn" @click="handleRestartClick">再来一局</button>
+          <button v-else-if="isHost" class="restart-btn" @click="handleRestartClick" :disabled="amIReady" :class="{ disabled: amIReady, 'pulse-cyan': isBlueReady && !amIReady }">
+              {{ amIReady ? '已就绪 - 等待蓝方' : (isBlueReady ? '蓝方已就绪 - 再来一局' : '再来一局') }}
+          </button>
+          <button v-else class="restart-btn" @click="handleRestartClick" :disabled="amIReady" :class="{ disabled: amIReady, 'pulse-cyan': isRedReady && !amIReady }">
+               {{ amIReady ? '已就绪 - 等待红方' : (isRedReady ? '红方已就绪 - 再来一局' : '再来一局') }}
+          </button>
 
-          
-          <!-- Unified Restart Button for both Host and Guest -->
-          <div class="restart-actions">
-            <!-- Solo View -->
-            <button v-if="isSolo" class="restart-btn" @click="handleRestartClick">
-                再来一局
-            </button>
+          <!-- Review (multiplayer only) -->
+          <button v-if="!isSolo" class="secondary-btn" style="width: 100%; margin-top: 10px;" @click="toggleReview">对局复盘</button>
 
-            <!-- Host View (Multiplayer) -->
-            <button v-else-if="isHost" class="restart-btn" @click="handleRestartClick" :disabled="amIReady" :class="{ disabled: amIReady, 'pulse-green': isBlueReady && !amIReady }">
-                {{ amIReady ? '已就绪 - 等待蓝方' : (isBlueReady ? '蓝方已就绪 - 再来一局' : '再来一局') }}
-            </button>
-            
-            <!-- Guest View (Multiplayer) -->
-            <button v-else class="restart-btn" @click="handleRestartClick" :disabled="amIReady" :class="{ disabled: amIReady, 'pulse-green': isRedReady && !amIReady }">
-                 {{ amIReady ? '已就绪 - 等待红方' : (isRedReady ? '红方已就绪 - 再来一局' : '再来一局') }}
-            </button>
-          </div>
-      
-      <!-- Custom Leave Confirmation Modal -->
-      <div v-if="showLeaveConfirm" class="modal-overlay">
-        <div class="confirm-card">
-          <h3>确定退出房间？</h3>
-          <div class="confirm-actions">
-            <button class="secondary-btn" @click="showLeaveConfirm = false">取消</button>
-            <button class="primary-btn" @click="confirmLeave">确定</button>
-          </div>
+          <button class="leave-btn" style="margin-top: 10px;" @click="handleLeave">退出房间</button>
         </div>
       </div>
-      
-          <!-- Review Button -->
-          <button class="secondary-btn" style="width: 100%; margin-bottom: 10px;" @click="toggleReview">对局复盘</button>
-          
-          <button class="leave-btn" @click="handleLeave">退出房间</button>
+    </div>
+
+    <!-- Leave Confirmation Modal (global, above overlay) -->
+    <div v-if="showLeaveConfirm" class="modal-overlay">
+      <div class="confirm-card">
+        <h3>确定退出房间？</h3>
+        <div class="confirm-actions">
+          <button class="secondary-btn" @click="showLeaveConfirm = false">取消</button>
+          <button class="primary-btn" @click="confirmLeave">确定</button>
         </div>
       </div>
-      
+    </div>
+
+    <!-- Board Zone -->
+    <div class="board-zone">
       <!-- Back to Result Button (Visible during Review) -->
       <button v-if="gameState.config?.winner && isReviewing" class="back-result-btn" @click="toggleReview">
           返回结算
@@ -137,14 +130,28 @@
       <canvas ref="canvasRef" :width="canvasPixels" :height="canvasPixels"></canvas>
     </div>
 
-    <!-- Bottom 30%: Control Zone -->
-    <div class="control-zone">
-      <!-- Mobile controls: D-pad layout with only ↑↓←→ -->
-      <div class="mobile-controls">
+    <!-- Bottom Control Zone: hidden when game is over (not reviewing) -->
+    <div class="control-zone" v-show="!gameState.config?.winner || isReviewing">
+      <!-- Mobile D-Pad: hidden when game over OR reviewing -->
+      <div v-if="!isReviewing && !gameState.config?.winner" class="mobile-controls">
         <button class="d-btn d-up" @pointerdown.prevent="handleMobileDir('up')">▲</button>
         <button class="d-btn d-left" @pointerdown.prevent="handleMobileDir('left')">◀</button>
         <button class="d-btn d-right" @pointerdown.prevent="handleMobileDir('right')">▶</button>
         <button class="d-btn d-down" @pointerdown.prevent="handleMobileDir('down')">▼</button>
+      </div>
+
+      <!-- Score Log: Shown during post-game review -->
+      <div v-else class="score-log-container">
+        <h3>对局得分日志</h3>
+        <div class="log-entries">
+            <div v-if="!gameState.scoreLogs || gameState.scoreLogs.length === 0" class="no-logs">暂无得分记录</div>
+            <div v-else class="log-entry" v-for="(log, idx) in gameState.scoreLogs" :key="idx" :class="log.color">
+                <span class="log-time">{{ new Date(log.timestamp).toLocaleTimeString([], {minute:'2-digit', second:'2-digit'}) }}</span>
+                <span class="log-player">{{ log.playerName }}</span>
+                <span class="log-action">{{ log.action }}</span>
+                <span class="log-points">+{{ log.points }}</span>
+            </div>
+        </div>
       </div>
     </div>
   </div>
@@ -248,6 +255,53 @@ const statusText = computed(() => {
     return `获胜目标 ${gameState.config.value}`;
   }
 });
+
+const handleKeydown = (e) => {
+    if (isReviewing.value || !gameState.config?.active) return;
+    if (playerColor.value === 'spectator') return;
+
+    if (playerColor.value === 'red') {
+        // Player 1: WASD
+        switch (e.code) {
+            case 'KeyA':
+                sendAction('left');
+                break;
+            case 'KeyD':
+                sendAction('right');
+                break;
+            case 'KeyS':
+                sendAction('down');
+                break;
+            case 'KeyW':
+                sendAction('rotate');
+                break;
+            case 'Space':
+                sendAction('drop');
+                break;
+        }
+    } else if (playerColor.value === 'blue') {
+        // Player 2: Arrows
+        switch (e.code) {
+            case 'ArrowLeft':
+                sendAction('left');
+                break;
+            case 'ArrowRight':
+                sendAction('right');
+                break;
+            case 'ArrowDown':
+                sendAction('down');
+                break;
+            case 'ArrowUp':
+                sendAction('rotate');
+                break;
+            case 'Space': 
+            case 'Enter': 
+            case 'NumpadEnter':
+                sendAction('drop');
+                break;
+        }
+    }
+};
 
 
 
@@ -372,50 +426,71 @@ const draw = () => {
   ctx.strokeRect(zoneStart * BLOCK_SIZE, zoneStart * BLOCK_SIZE, 4 * BLOCK_SIZE, 4 * BLOCK_SIZE);
   ctx.setLineDash([]);
 
+  // Helper to draw 8-bit block
+  const draw8BitBlock = (x, y, isRed) => {
+      const baseColor = isRed ? '#e52521' : '#0047bb';
+      const lightColor = isRed ? '#ff5956' : '#4f7df5';
+      const darkColor = isRed ? '#820000' : '#001f5c';
+      const borderSize = 4;
+
+      ctx.fillStyle = baseColor;
+      ctx.fillRect(x, y, BLOCK_SIZE, BLOCK_SIZE);
+      
+      // Top highlight
+      ctx.fillStyle = lightColor;
+      ctx.fillRect(x, y, BLOCK_SIZE, borderSize);
+      // Left highlight
+      ctx.fillRect(x, y, borderSize, BLOCK_SIZE);
+      
+      // Bottom shadow
+      ctx.fillStyle = darkColor;
+      ctx.fillRect(x, y + BLOCK_SIZE - borderSize, BLOCK_SIZE, borderSize);
+      // Right shadow
+      ctx.fillRect(x + BLOCK_SIZE - borderSize, y, borderSize, BLOCK_SIZE);
+  };
+
   // Draw Board
   if (gameState.board && gameState.board.length > 0) {
     for (let r = 0; r < rows; r++) {
         for (let c = 0; c < cols; c++) {
             const val = gameState.board[r][c];
             if (val) {
-                ctx.fillStyle = val === 1 ? '#cc2233' : '#2244cc';
-                ctx.fillRect(c * BLOCK_SIZE + 1, r * BLOCK_SIZE + 1, BLOCK_SIZE - 2, BLOCK_SIZE - 2);
+                draw8BitBlock(c * BLOCK_SIZE, r * BLOCK_SIZE, val === 1);
             }
         }
     }
   }
+
+  // Draw Edge Targets removed per user request
 
   // Draw Players
   if (gameState.players) {
     Object.values(gameState.players).forEach(player => {
         if (!player.piece) return;
         const isRed = player.color === 'red';
-        ctx.fillStyle = isRed ? '#ff4466' : '#4488ff';
-        ctx.shadowColor = isRed ? 'rgba(255, 68, 102, 0.6)' : 'rgba(68, 136, 255, 0.6)';
-        ctx.shadowBlur = 8;
         const shape = player.piece.shape;
         for (let r = 0; r < shape.length; r++) {
             for (let c = 0; c < shape[r].length; c++) {
                 if (shape[r][c]) {
                     const x = (player.piece.x + c) * BLOCK_SIZE;
                     const y = (player.piece.y + r) * BLOCK_SIZE;
-                    ctx.fillRect(x + 1, y + 1, BLOCK_SIZE - 2, BLOCK_SIZE - 2);
+                    
+                    draw8BitBlock(x, y, isRed);
                     
                     // Add White Outline for active pieces (Only for own piece)
                     if (player.color === playerColor.value) {
                         ctx.strokeStyle = '#ffffff';
-                        ctx.lineWidth = 2;
-                        ctx.strokeRect(x + 1, y + 1, BLOCK_SIZE - 2, BLOCK_SIZE - 2);
+                        ctx.lineWidth = 4; // Thicker stroke for 8-bit
+                        ctx.strokeRect(x + 2, y + 2, BLOCK_SIZE - 4, BLOCK_SIZE - 4);
                     }
                 }
             }
         }
-        ctx.shadowBlur = 0;
     });
   }
 
-  // 3. Draw Scores (On Top of Everything)
-  if (gameState.config?.bgRects && showScores.value) {
+  // 3. Draw Scores and Captures (On Top of Everything)
+  if (gameState.config?.bgRects) {
       // Score Map for display
       const scoreMap = { 8: 10, 10: 15, 12: 20, 16: 30 };
       
@@ -446,7 +521,7 @@ const draw = () => {
               }
 
               if (isRed || isBlue) {
-                  // Captured - Draw White Stroke
+                  // Captured - Draw White Stroke (Always visible when captured)
                   ctx.strokeStyle = '#ffffff';
                   ctx.lineWidth = 3;
                   ctx.strokeRect(
@@ -456,8 +531,8 @@ const draw = () => {
                       rect.h * BLOCK_SIZE - 2
                   );
 
-                  // Apply Styles to score text
-                  ctx.font = 'bold 30px monospace';
+                  // Apply Styles to score text (Always visible when captured)
+                  ctx.font = '24px "Zpix", "Press Start 2P", monospace';
                   ctx.textAlign = 'center';
                   ctx.textBaseline = 'middle';
                   
@@ -466,30 +541,32 @@ const draw = () => {
 
                   if (isRed) {
                       // Red Owned
-                      ctx.fillStyle = '#ff6b6b'; 
-                      ctx.lineWidth = 4;
+                      ctx.fillStyle = '#ff0000'; 
+                      ctx.lineWidth = 6;
                       ctx.strokeStyle = '#ffffff';
                       ctx.strokeText('+' + score, centerX, centerY);
                       ctx.fillText('+' + score, centerX, centerY);
                   } else {
                       // Blue Owned
-                      ctx.fillStyle = '#4dabf7';
-                      ctx.lineWidth = 4;
+                      ctx.fillStyle = '#0088ff';
+                      ctx.lineWidth = 6;
                       ctx.strokeStyle = '#ffffff';
                       ctx.strokeText('+' + score, centerX, centerY);
                       ctx.fillText('+' + score, centerX, centerY);
                   }
               } else {
                   // Not captured - Default styling
-                  ctx.font = 'bold 30px monospace';
-                  ctx.textAlign = 'center';
-                  ctx.textBaseline = 'middle';
-                  
-                  const centerX = (rect.x + rect.w / 2) * BLOCK_SIZE;
-                  const centerY = (rect.y + rect.h / 2) * BLOCK_SIZE;
+                  if (showScores.value) {
+                      ctx.font = '24px "Zpix", "Press Start 2P", monospace';
+                      ctx.textAlign = 'center';
+                      ctx.textBaseline = 'middle';
+                      
+                      const centerX = (rect.x + rect.w / 2) * BLOCK_SIZE;
+                      const centerY = (rect.y + rect.h / 2) * BLOCK_SIZE;
 
-                  ctx.fillStyle = '#9ee79eff'; // Bright Green
-                  ctx.fillText('+' + score, centerX, centerY);
+                      ctx.fillStyle = '#00ffff'; // Retro Cyan
+                      ctx.fillText('+' + score, centerX, centerY);
+                  }
               }
           }
       });
@@ -510,6 +587,7 @@ watch(boardRows, () => {
 
 onMounted(() => {
   window.addEventListener('resize', resizeBoard);
+  window.addEventListener('keydown', handleKeydown);
   resizeBoard();
   draw();
 
@@ -520,25 +598,46 @@ onMounted(() => {
 
 onUnmounted(() => {
   window.removeEventListener('resize', resizeBoard);
+  window.removeEventListener('keydown', handleKeydown);
   if (countdownInterval) clearInterval(countdownInterval);
 });
 </script>
 
 <style scoped>
-/* CSS Update for ChatGPT Dark Mode + 70/30 Split */
+/* CSS Update for Retro Arcade Theme */
 .game-container {
   display: flex;
   flex-direction: column;
+  position: fixed;
+  top: 0; left: 0; right: 0;
   width: 100%;
   height: 100vh;
+  height: 100svh; /* mobile browser chrome aware */
   overflow: hidden;
   touch-action: none;
-  background: #171717; /* Canvas/Board background */
+  background-color: #050505;
+  background-image: 
+    linear-gradient(rgba(0, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 255, 255, 0.03) 1px, transparent 1px);
+  background-size: 30px 30px;
+  position: relative;
+}
+.game-container::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: radial-gradient(circle at center, transparent 40%, rgba(0,0,0,0.8) 100%);
+  pointer-events: none;
+  z-index: 0;
+}
+.board-zone, .control-zone {
+  position: relative;
+  z-index: 1;
 }
 
 /* --- Top 70% Board Zone --- */
 .board-zone {
-  flex: 7;
+  flex: 6; /* 60% relative size for better mobile control reach */
   position: relative;
   display: flex;
   flex-direction: column;
@@ -550,74 +649,93 @@ onUnmounted(() => {
 
 /* HUD */
 .hud {
-  margin-bottom: 10px;
+  margin-bottom: 6px;
   z-index: 10;
+  width: 100%;
+  text-align: center;
+  padding: 0 8px;
+  box-sizing: border-box;
 }
 
 .status-text {
-  font-size: 1.1em;
+  font-size: clamp(0.6em, 2vw, 0.9em);
   font-weight: 600;
-  margin-bottom: 6px;
-  color: #ececec;
+  margin-bottom: 4px;
+  color: #00ffff;
   text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  text-shadow: 1px 1px 0 #000;
 }
 
 .territory-bar-container {
-  width: 500px;
-  max-width: 80%;
+  width: 90%;
+  max-width: 480px;
   height: 12px;
-  background: #2f2f2f;
-  margin: 0 auto 8px;
+  background: #111;
+  margin: 0 auto 6px;
   display: flex;
-  border-radius: 6px;
+  border-radius: 0;
   overflow: hidden;
-  box-shadow: 0 0 15px rgba(0,0,0,0.5);
-  border: 1px solid #444;
+  box-shadow: 4px 4px 0 #000;
+  border: 4px solid #444;
 }
 .bar { height: 100%; transition: width 0.5s ease; }
 .red { background: #ff6b6b; }
 .blue { background: #4dabf7; }
 
 .territory-text {
-  font-size: 0.85em;
+  font-size: clamp(0.6em, 2vw, 0.85em);
   color: #b4b4b4;
   display: flex;
   justify-content: center;
   align-items: center;
+  gap: 4px;
 }
-.score-red { color: #ff6b6b; font-size: 1.3em; font-weight: 800; text-shadow: 0 2px 4px rgba(0,0,0,0.6); }
-.score-blue { color: #4dabf7; font-size: 1.3em; font-weight: 800; text-shadow: 0 2px 4px rgba(0,0,0,0.6); }
-.score-divider { margin: 0 12px; color: #777; font-weight: bold; }
+.score-red { color: #ff6b6b; font-size: 1.2em; font-weight: 800; text-shadow: 2px 2px 0 #000; }
+.score-blue { color: #4dabf7; font-size: 1.2em; font-weight: 800; text-shadow: 2px 2px 0 #000; }
+.score-divider { margin: 0 6px; color: #444; font-weight: bold; }
 
 canvas {
-  /* Ensure canvas fits within the board zone */
   max-width: 96%;
   max-height: 80%;
   object-fit: contain;
-  border: 1px solid #333;
+  border: 4px solid #333;
   background: #000;
-  border-radius: 4px;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+  border-radius: 0;
+  box-shadow: 6px 6px 0 #000;
+  display: block;
 }
 
-/* Game Over Overlay */
+/* Game Over Overlay — full screen */
 .overlay {
-  position: absolute;
+  position: fixed;
   top: 0; left: 0; right: 0; bottom: 0;
-  background: rgba(0, 0, 0, 0.85);
-  z-index: 100;
+  background: rgba(0, 0, 0, 0.92);
+  z-index: 500;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 .overlay-card {
-  background: #2f2f2f;
-  border: 1px solid #424242;
-  border-radius: 12px;
-  padding: 32px 48px;
+  background: #111;
+  border: 6px solid #444;
+  border-top: 6px solid #00ffff; /* Cyan accent top edge */
+  border-radius: 0;
+  padding: 28px 24px 20px;
   text-align: center;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  width: 92%;
+  max-width: 400px;
+  max-height: 92vh;
+  overflow-y: auto;
+  box-sizing: border-box;
+  box-shadow: 
+    inset 4px 4px 0 #000,
+    inset -4px -4px 0 #222,
+    8px 8px 0 #000;
+  position: relative;
 }
+.overlay-card::after { display: none; }
 .overlay-card h2 {
   font-size: 1.5em;
   margin: 0 0 12px;
@@ -631,81 +749,124 @@ canvas {
   color: #b4b4b4;
 }
 .restart-btn {
-  padding: 10px 28px;
+  padding: 12px 28px;
   font-size: 1.1em;
-  border-radius: 6px;
-  background: #10a37f;
-  border: none;
+  border-radius: 0;
+  background: #0088cc;
+  border: 4px solid #fff;
   color: white;
   cursor: pointer;
   width: 100%;
-  margin-bottom: 10px;
+  margin-bottom: 12px;
+  text-transform: uppercase;
+  font-family: inherit;
+  box-shadow: 4px 4px 0 #00ffff;
+  position: relative;
+  z-index: 2;
+  transition: all 0.1s;
 }
 .waiting-text {
   color: #888;
   margin-bottom: 16px;
   font-size: 0.9em;
   animation: pulse 2s infinite;
+  position: relative;
+  z-index: 2;
 }
 .restart-btn:hover {
-  background: #1a7f64;
+  background: #fff;
+  color: #000;
+  border-color: #00ffff;
+}
+.restart-btn:active {
+  transform: translate(2px, 2px);
+  box-shadow: 2px 2px 0 #00ffff;
 }
 .leave-btn {
-  padding: 8px 20px;
+  padding: 10px 20px;
   font-size: 0.95em;
-  border-radius: 6px;
-  background: transparent;
-  border: 1px solid #555;
-  color: #b4b4b4;
+  border-radius: 0;
+  background: #d32f2f;
+  border: 4px solid #ff0000;
+  color: #fff;
   cursor: pointer;
   width: 100%;
+  font-family: inherit;
+  text-transform: uppercase;
+  box-shadow: 4px 4px 0 #ff0000;
+  position: relative;
+  z-index: 2;
+  transition: all 0.1s;
 }
 .leave-btn:hover {
-  background: #3a3a3a;
-  color: #ececec;
+  background: #ff0000;
+  color: #000;
+}
+.leave-btn:active {
+  transform: translate(2px, 2px);
+  box-shadow: 2px 2px 0 #ff0000;
 }
 
 /* Surrender */
 .surrender-btn {
   position: absolute;
-  top: 16px;
-  right: 110px; /* Left of toggle button (was 16px) */
-  padding: 6px 16px;
-  font-size: 0.85em;
-  border-radius: 6px;
-  background: rgba(42, 26, 26, 0.9);
-  border: 1px solid #533;
+  top: 10px;
+  right: 116px;
+  padding: 6px 10px;
+  font-size: 0.75em;
+  border-radius: 0;
+  background: #3a0a0a;
+  border: 4px solid #cc2222;
+  box-shadow: 4px 4px 0 #000;
   color: #ff8888;
   cursor: pointer;
   z-index: 200;
+  font-family: inherit;
+  text-transform: uppercase;
+  transition: all 0.1s;
 }
 .surrender-btn:hover {
-  background: #502020;
-  color: #ffaaaa;
+  background: #cc2222;
+  color: #fff;
+  border-color: #ff4444;
+}
+.surrender-btn:active {
+  transform: translate(2px, 2px);
+  box-shadow: 2px 2px 0 #000;
 }
 
 .toggle-score-btn {
   position: absolute;
-  top: 16px;
-  right: 16px; /* Rightmost (was 80px) */
-  padding: 6px 12px;
-  font-size: 0.85em;
-  border-radius: 6px;
-  background: rgba(30, 30, 30, 0.9);
-  border: 1px solid #555;
+  top: 10px;
+  right: 10px;
+  padding: 6px 10px;
+  font-size: 0.75em;
+  border-radius: 0;
+  background: #181818;
+  border: 4px solid #555;
+  box-shadow: 4px 4px 0 #000;
   color: #aaa;
   cursor: pointer;
   z-index: 200;
-  transition: all 0.2s;
+  transition: all 0.1s;
+  font-family: inherit;
+  text-transform: uppercase;
+  white-space: nowrap;
 }
 .toggle-score-btn:hover {
-  background: #444;
-  color: #fff;
+  background: #555;
+  color: #00ffff;
+  border-color: #00ffff;
+}
+.toggle-score-btn:active {
+  transform: translate(2px, 2px);
+  box-shadow: 2px 2px 0 #000;
 }
 .toggle-score-btn.active {
-  background: rgba(16, 163, 127, 0.2);
-  border-color: #10a37f;
-  color: #10a37f;
+  background: #003355;
+  border-color: #00ffff;
+  color: #00ffff;
+  box-shadow: 4px 4px 0 #00ffff;
 }
 
 /* Modal Overlay */
@@ -715,21 +876,31 @@ canvas {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0,0,0,0.7);
+  background: rgba(0,0,0,0.88);
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 300;
-  backdrop-filter: blur(4px);
+  z-index: 600;
 }
 .confirm-card {
-  background: #2f2f2f;
+  background: #111;
   padding: 24px;
-  border-radius: 12px;
-  border: 1px solid #424242;
+  border-radius: 0;
+  border: 6px solid #444;
   text-align: center;
   width: 280px;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+  box-shadow: 
+    inset 4px 4px 0 #000,
+    inset -4px -4px 0 #222,
+    8px 8px 0 #000;
+  position: relative;
+}
+.confirm-card::after {
+  content: '';
+  position: absolute;
+  top: 4px; left: 4px; right: 4px; bottom: 4px;
+  border: 2px dashed #333;
+  pointer-events: none;
 }
 .confirm-card h3 {
   margin: 0 0 20px;
@@ -738,36 +909,71 @@ canvas {
 }
 .confirm-actions {
   display: flex;
-  gap: 12px;
+  gap: 16px;
   justify-content: center;
+  position: relative;
+  z-index: 2;
 }
 .confirm-actions button {
   flex: 1;
-  padding: 10px;
-  border-radius: 8px;
+  padding: 12px;
+  border-radius: 0;
   border: none;
   font-size: 1em;
+  font-family: inherit;
   cursor: pointer;
+  text-transform: uppercase;
+  transition: all 0.1s;
 }
-.confirm-actions .secondary-btn {
-  background: #424242;
-  color: #b4b4b4;
+.secondary-btn {
+  padding: 12px;
+  font-size: 1.1em;
+  background: #222;
+  color: #fff;
+  border: 4px solid #888;
+  box-shadow: 4px 4px 0 #000;
+  text-transform: uppercase;
+  font-family: inherit;
+  cursor: pointer;
+  border-radius: 0;
+  transition: all 0.1s;
+}
+.secondary-btn:hover {
+  background: #888;
+  color: #000;
+  border-color: #fff;
+}
+.secondary-btn:active {
+  transform: translate(2px, 2px);
+  box-shadow: 2px 2px 0 #000;
 }
 .confirm-actions .primary-btn {
-  background: #10a37f;
+  background: #0088cc;
   color: white;
+  border: 2px solid #00ffff;
+  box-shadow: 2px 2px 0 #000;
+}
+.confirm-actions .primary-btn:hover {
+  background: #00ffff;
+  color: #000;
+}
+.confirm-actions button:active {
+  transform: translate(2px, 2px);
+  box-shadow: 0 0 0 #000;
 }
 
-/* --- Bottom 30% Control Zone --- */
+/* --- Bottom Control Zone --- */
 .control-zone {
-  flex: 3;
-  background: #212121; /* Darker control area */
-  border-top: 1px solid #333;
+  flex: 4;
+  background: #050505;
+  border-top: 4px solid #00ffff;
+  box-shadow: 0 -4px 0 #000, 0 -8px 0 #003355;
   display: flex;
   align-items: center;
   justify-content: center;
   position: relative;
   z-index: 50;
+  padding: 0 10px;
 }
 
 /* Mobile Controls - No longer fixed, centered in zone */
@@ -784,28 +990,22 @@ canvas {
   position: absolute;
   width: 68px; /* Larger hit targets */
   height: 68px;
-  border-radius: 12px;
-  background: #2f2f2f;
-  border: 1px solid #444;
-  color: #ececec;
+  border-radius: 0; /* No rounded corners */
+  background: #111;
+  border: 4px solid #555;
+  color: #fff;
   font-size: 24px;
   display: flex;
   justify-content: center;
   align-items: center;
   cursor: pointer;
   user-select: none;
-  touch-action: manipulation;
+  touch-action: none; /* Critical for fast consecutive taps on mobile */
   -webkit-tap-highlight-color: transparent;
   padding: 0;
   margin: 0;
   pointer-events: auto;
-  box-shadow: 0 4px 0 #1a1a1a;
-}
-
-.d-btn:active {
-  background: #3a3a3a;
-  color: #10a37f;
-  border-color: #10a37f;
+  box-shadow: 4px 4px 0 #555; /* Solid retro shadow */
 }
 
 /* Position buttons in Inverted T pattern (Laptop/Keyboard style) */
@@ -818,6 +1018,110 @@ canvas {
 .d-left  { top: 95px;  left: 50%; transform: translateX(-160%); } /* 50% - ~75px */
 /* Right is to the right of Down */
 .d-right { top: 95px;  left: 50%; transform: translateX(60%); }  /* 50% + ~40px */
+
+/* Score Log Container (Replaces D-pad during review) */
+.score-log-container {
+  width: 90%;
+  height: 90%;
+  background: #111;
+  border: 4px solid #333;
+  display: flex;
+  flex-direction: column;
+  padding: 10px;
+  box-sizing: border-box;
+  box-shadow: inset 4px 4px 0 #000;
+}
+
+.score-log-container h3 {
+  margin: 0 0 10px 0;
+  color: #ffff00;
+  text-align: center;
+  font-size: 1.2rem;
+  border-bottom: 2px dashed #444;
+  padding-bottom: 8px;
+}
+
+.log-entries {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-right: 5px;
+}
+
+/* Custom Scrollbar for the log */
+.log-entries::-webkit-scrollbar {
+  width: 12px;
+}
+.log-entries::-webkit-scrollbar-track {
+  background: #000;
+  border-left: 2px solid #222;
+}
+.log-entries::-webkit-scrollbar-thumb {
+  background: #333;
+  border: 2px solid #111;
+}
+
+.no-logs {
+  text-align: center;
+  color: #777;
+  font-size: 0.9rem;
+  margin-top: 20px;
+}
+
+.log-entry {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px;
+  background: #000;
+  border: 2px solid #333;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  text-transform: uppercase;
+}
+
+.log-entry.red {
+  border-color: rgba(255, 0, 0, 0.4);
+  color: #ffaaaa;
+  box-shadow: inset 4px 0 0 #ff0000;
+}
+
+.log-entry.blue {
+  border-color: rgba(0, 136, 204, 0.4);
+  color: #add8e6;
+  box-shadow: inset 4px 0 0 #0088cc;
+}
+
+.log-time {
+  color: #666;
+  font-size: 0.65rem;
+  min-width: 45px;
+}
+
+.log-player {
+  font-weight: bold;
+  flex: 1;
+  margin: 0 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.log-action {
+  color: #ccc;
+  flex: 2;
+  text-align: left;
+}
+
+.log-points {
+  font-weight: bold;
+  font-size: 0.85rem;
+  color: #ffff00;
+  text-shadow: 1px 1px 0 #000;
+}
+
 </style>
 
 <style scoped>
@@ -838,8 +1142,9 @@ canvas {
   align-items: center;
   margin: 20px 0;
   padding: 16px;
-  background: rgba(0,0,0,0.2);
-  border-radius: 12px;
+  background: #000;
+  border-radius: 0;
+  border: 4px solid #333;
 }
 .solo-label {
   font-size: 1rem;
@@ -849,48 +1154,51 @@ canvas {
 .solo-value {
   font-size: 3.5rem;
   font-weight: 800;
-  color: #4ade80;
-  text-shadow: 0 0 20px rgba(74, 222, 128, 0.3);
-  font-family: 'Inter', monospace;
+  color: #00ffff;
+  text-shadow: 0 0 20px rgba(0, 255, 255, 0.3);
+  font-family: inherit;
 }
 .status-pill {
-  background: #333;
+  background: #111;
   padding: 6px 12px;
-  border-radius: 20px;
+  border-radius: 0;
   font-size: 0.9em;
   color: #888;
-  border: 1px solid #444;
+  border: 2px solid #444;
   display: flex;
   align-items: center;
   gap: 6px;
-  transition: all 0.3s ease;
+  transition: all 0.1s;
 }
 .status-pill .dot {
-  width: 8px; height: 8px; border-radius: 50%; background: #666;
+  width: 10px; height: 10px; border-radius: 0; background: #666;
 }
 .status-pill.ready {
-  border-color: #10a37f;
+  border-color: #00ffff;
   color: #ececec;
-  background: rgba(16, 163, 127, 0.1);
+  background: rgba(0, 255, 255, 0.1);
 }
-.status-pill.ready .dot { background: #10a37f; box-shadow: 0 0 5px #10a37f; }
+.status-pill.ready .dot { background: #00ffff; box-shadow: 0 0 5px #00ffff; }
 .status-pill.red.ready { border-color: #ff6b6b; background: rgba(255,107,107,0.1); }
 .status-pill.red.ready .dot { background: #ff6b6b; box-shadow: 0 0 5px #ff6b6b; }
 .status-pill.blue.ready { border-color: #4dabf7; background: rgba(77,171,247,0.1); }
 .status-pill.blue.ready .dot { background: #4dabf7; box-shadow: 0 0 5px #4dabf7; }
 
 .restart-btn.disabled {
-  background: #444;
+  background: #222;
+  border-color: #444;
+  box-shadow: none;
   cursor: not-allowed;
-  color: #aaa;
+  color: #555;
+  transform: none;
 }
 .pulse-green {
-  animation: pulse-green 2s infinite;
+  animation: pulse-cyan 2s infinite;
 }
-@keyframes pulse-green {
-  0% { box-shadow: 0 0 0 0 rgba(16, 163, 127, 0.7); }
-  70% { box-shadow: 0 0 0 10px rgba(16, 163, 127, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(16, 163, 127, 0); }
+@keyframes pulse-cyan {
+  0% { box-shadow: 0 0 0 0 rgba(0, 255, 255, 0.7); }
+  70% { box-shadow: 0 0 0 10px rgba(0, 255, 255, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(0, 255, 255, 0); }
 }
 
 .back-result-btn {
@@ -899,26 +1207,51 @@ canvas {
   left: 50%;
   transform: translateX(-50%);
   padding: 8px 24px;
-  background: #2f2f2f;
-  border: 1px solid #555;
-  color: #ececec;
-  border-radius: 20px;
+  background: #222;
+  border: 4px solid #888;
+  color: #fff;
+  border-radius: 0;
   cursor: pointer;
   z-index: 200;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.5);
-  font-weight: bold;
+  font-family: inherit;
+  box-shadow: 4px 4px 0 #000;
+  text-transform: uppercase;
+  transition: all 0.1s;
 }
+
 .back-result-btn:hover {
-  background: #444;
-  border-color: #777;
+  background: #888;
+  color: #000;
+  border-color: #fff;
+}
+.back-result-btn:active {
+  transform: translate(calc(-50% + 2px), 2px);
+  box-shadow: 2px 2px 0 #000;
 }
 
 /* Result Card (History Style) */
 .result-card {
-  background: #3a3a3a;
-  border-radius: 8px;
-  padding: 16px 20px;
-  margin-bottom: 20px;
+  width: 100%;
+  max-width: 380px;
+  background: #111;
+  border: 6px solid #444;
+  border-radius: 0;
+  padding: 16px;
+  margin: 16px auto;
+  box-shadow: 
+    inset 4px 4px 0 #000,
+    inset -4px -4px 0 #222,
+    8px 8px 0 #000;
+  position: relative;
+}
+.result-card::after {
+  content: '';
+  position: absolute;
+  top: 4px; left: 4px; right: 4px; bottom: 4px;
+  border: 2px dashed #333;
+  pointer-events: none;
+}
+.result-card {
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -940,9 +1273,10 @@ canvas {
   margin-bottom: 4px;
 }
 .h-mode-tag {
-  background: #444;
+  background: #0088cc;
+  color: #fff;
   padding: 2px 6px;
-  border-radius: 4px;
+  border: 2px solid #00ffff;
   justify-self: start;
 }
 .h-winner-tag {
@@ -973,8 +1307,12 @@ canvas {
 .h-player-side.is-win {
   color: #fff;
   font-weight: 700;
-  text-shadow: 0 0 10px rgba(255,255,255,0.2);
+  text-shadow: 2px 2px 0 #000;
   transform: scale(1.05);
+  border: 2px dashed #00ffff;
+  padding: 8px;
+  background: #0088cc;
+  box-shadow: 4px 4px 0 #000;
 }
 
 .h-info-group {
@@ -994,10 +1332,10 @@ canvas {
 .h-dot {
   width: 12px;
   height: 12px;
-  border-radius: 50%;
+  border-radius: 0;
 }
-.h-dot.red { background: #ff6b6b; box-shadow: 0 0 6px #ff6b6b; }
-.h-dot.blue { background: #4dabf7; box-shadow: 0 0 6px #4dabf7; }
+.h-dot.red { background: #ff6b6b; box-shadow: 2px 2px 0 #cc0000; }
+.h-dot.blue { background: #4dabf7; box-shadow: 2px 2px 0 #0055cc; }
 
 .h-name {
     font-size: 0.9em;
@@ -1009,7 +1347,7 @@ canvas {
 }
 
 .h-score-num {
-    font-family: 'Courier New', monospace;
+    font-family: inherit;
     font-size: 1.8em;
     font-weight: 800;
     line-height: 1;
@@ -1027,12 +1365,50 @@ canvas {
     font-size: 0.75em;
     background: #555;
     color: #ddd;
-    padding: 1px 5px;
-    border-radius: 4px;
+    padding: 2px 6px;
+    border-radius: 0;
+    border: 1px solid #777;
+    margin-top: 4px;
 }
-
 .surrender-mini-tag.surrender-left {
     margin-left: 0;
     margin-right: 6px;
 }
+
+/* ===== Mobile Responsive Overrides ===== */
+@media (max-width: 480px) {
+  /* Shrink HUD labels even more on narrow phones */
+  .status-text { font-size: 0.55em; }
+  .territory-bar-container { height: 10px; border-width: 2px; }
+  .score-red, .score-blue { font-size: 1em; }
+
+  /* Make the two action buttons fit side by side */
+  .surrender-btn,
+  .toggle-score-btn {
+    font-size: 0.6em;
+    padding: 4px 8px;
+    border-width: 3px;
+    box-shadow: 3px 3px 0 #000;
+  }
+  .toggle-score-btn { right: 6px; top: 6px; }
+  .surrender-btn { right: 96px; top: 6px; }
+
+  /* Tighter overlay card on small phone */
+  .overlay-card {
+    padding: 12px 10px;
+    width: 95%;
+  }
+
+  /* Thinner confirm card */
+  .confirm-card {
+    width: 95%;
+    padding: 16px;
+  }
+
+  /* Score log inside control zone */
+  .score-log-container { padding: 6px; }
+  .score-log-container h3 { font-size: 0.8rem; margin-bottom: 6px; }
+  .log-entry { font-size: 0.65em; }
+}
 </style>
+
