@@ -2,8 +2,8 @@
 
 # Define paths relative to the script location
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
-BACKEND_DIR="$SCRIPT_DIR/tetris-shared"
-FRONTEND_DIR="$SCRIPT_DIR/tetris-vue"
+BACKEND_DIR="$SCRIPT_DIR/fortress-shared"
+FRONTEND_DIR="$SCRIPT_DIR/fortress-vue"
 
 # Function to check port usage
 check_port() {
@@ -14,7 +14,7 @@ check_port() {
     fi
 }
 
-echo "=== Starting Multiplayer Tetris ==="
+echo "=== Starting Fortress Battle ==="
 
 # Check if ports are already in use
 if check_port 3000; then
@@ -52,7 +52,7 @@ if [ ! -d "node_modules" ]; then
 fi
 nohup node server.js > server.log 2>&1 &
 BACKEND_PID=$!
-echo "Backend started with PID $BACKEND_PID (Logs: tetris-shared/server.log)"
+echo "Backend started with PID $BACKEND_PID (Logs: fortress-shared/server.log)"
 
 # Start Frontend
 echo "Starting Vue Frontend..."
@@ -63,7 +63,7 @@ if [ ! -d "node_modules" ]; then
 fi
 nohup npm run dev -- --host > vue.log 2>&1 &
 FRONTEND_PID=$!
-echo "Frontend started with PID $FRONTEND_PID (Logs: tetris-vue/vue.log)"
+echo "Frontend started with PID $FRONTEND_PID (Logs: fortress-vue/vue.log)"
 
 echo "=== Game Started ==="
 echo "Backend running at: http://localhost:3000"

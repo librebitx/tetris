@@ -28,17 +28,17 @@
 
 - **前端**：Vue 3, Vite, Socket.io Client
 - **后端**：Node.js, Socket.io
-- **部署**：Nginx (反向代理), PM2 (进程管理)
+- **部署**：Nginx, PM2
 
 ## 项目结构
 
 ```
 .
-├── tetris-shared/          # 后端服务
+├── fortress-shared/          # 后端服务
 │   ├── server.js           # 游戏服务器逻辑
 │   ├── history.json        # 历史记录数据
 │   └── ...
-├── tetris-vue/             # 前端应用
+├── fortress-vue/             # 前端应用
 │   ├── src/                # Vue 源代码
 │   ├── vite.config.js      # Vite 配置 (包含开发代理)
 │   └── ...
@@ -56,12 +56,12 @@
    sudo apt update && sudo apt upgrade -y
    sudo apt install -y curl git unzip build-essential
    
-   git clone https://github.com/librebitx/tetris.git
-   cd tetris/
+   git clone https://github.com/librebitx/fortress-battle.git
+   cd fortress-battle/
    
    ./init.sh
    
-   # 记得修改 /etc/nginx/sites-available/tetris 中的 server_name
+   # 记得修改 /etc/nginx/sites-available/fortress-battle 中的 server_name
    ```
    
 2. **启动游戏**：

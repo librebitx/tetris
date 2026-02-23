@@ -6,20 +6,20 @@
 
 ### 本地开发 (start_game.sh)
 使用脚本启动时，日志会输出到项目目录：
-- **后端日志**: `tetris-shared/server.log`
-- **前端日志**: `tetris-vue/vue.log`
+- **后端日志**: `fortress-shared/server.log`
+- **前端日志**: `fortress-vue/vue.log`
 
 **实时查看命令**:
 ```bash
-tail -f tetris-shared/server.log
+tail -f fortress-shared/server.log
 # 或
-tail -f tetris-vue/vue.log
+tail -f fortress-vue/vue.log
 ```
 
 ### 生产环境 (PM2)
 如果使用 PM2 管理进程：
 ```bash
-pm2 logs tetris-backend
+pm2 logs fortress-backend
 pm2 logs                # 查看所有日志
 ```
 
@@ -27,9 +27,9 @@ pm2 logs                # 查看所有日志
 
 ### A. 历史记录不保存 (History Not Saving)
 如果游戏结束但看不到历史记录：
-1. **检查权限**：确保后端进程有权写入 `tetris-shared/history.json`。
+1. **检查权限**：确保后端进程有权写入 `fortress-shared/history.json`。
    ```bash
-   ls -l tetris-shared/history.json
+   ls -l fortress-shared/history.json
    # 确保文件所属用户与运行 Node.js 的用户一致
    ```
 2. **Top Out (方块溢出)**：已修复 Bug，即使因方块堆满结束游戏也会记录。

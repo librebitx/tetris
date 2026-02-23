@@ -5,32 +5,32 @@ curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
 sudo apt install -y nodejs
 node -v
 
-cd ~/tetris/tetris-vue
+cd ~/fortress-battle/fortress-vue
 npm install
 npm run build
 
-cd ../tetris-shared
+cd ../fortress-shared
 npm install
 sudo npm install -g pm2
-pm2 start server.js --name "tetris-backend"
+pm2 start server.js --name "fortress-backend"
 cd ..
 
 sudo apt install nginx
-sudo mkdir -p /var/www/tetris
-sudo cp -r /root/tetris/tetris-vue/dist/* /var/www/tetris/
-sudo chown -R www-data:www-data /var/www/tetris
-sudo chmod -R 755 /var/www/tetris
+sudo mkdir -p /var/www/fortress
+sudo cp -r /root/fortress/fortress-vue/dist/* /var/www/fortress/
+sudo chown -R www-data:www-data /var/www/fortress
+sudo chmod -R 755 /var/www/fortress
 
-sudo ln -s /etc/nginx/sites-available/tetris /etc/nginx/sites-enabled/
+sudo ln -s /etc/nginx/sites-available/fortress /etc/nginx/sites-enabled/
 sudo rm /etc/nginx/sites-enabled/default
 
-sudo cat <<EOL> /etc/nginx/sites-available/tetris
+sudo cat <<EOL> /etc/nginx/sites-available/fortress
 server {
     listen 80;
     server_name 您的公网IP或域名;
 
     location / {
-        root /var/www/tetris;
+        root /var/www/fortress;
         try_files $uri $uri/ /index.html;
         index index.html;
     }

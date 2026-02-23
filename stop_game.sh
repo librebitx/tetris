@@ -1,6 +1,6 @@
 #!/bin/bash
 
-echo "=== Stopping Multiplayer Tetris ==="
+echo "=== Stopping Fortress Battle ==="
 
 # Find and kill the backend node process running server.js
 # We use pgrep with -f to match the full command line
