@@ -110,31 +110,19 @@ function partitionLine(totalWidth, allowedWidths) {
 function generateTiling(rows, cols) {
     const rects = [];
 
-    // Define exclusion zone (center 4x4)
-    const zoneX = Math.floor(cols / 2) - 2;
-    const zoneY = Math.floor(rows / 2) - 2;
-    const zoneW = 4;
-    const zoneH = 4;
-
     // Helper to fill a strip at y with height h, covering x range [start, end)
     const fillStrip = (y, h, start, end) => {
         const width = end - start;
         if (width <= 0) return;
 
-        // Adjust allowed widths based on total width available
+        // Allowed widths: for h=4 use narrower pieces, for h=2 use wider pieces
         let allowed = (h === 4) ? [2, 3, 4] : [4, 5, 6, 8];
-
-        // Filter allowed to ensure we don't pick something larger than total width
-        // If width is very small (e.g. < min allowed), we rely on partitionLine fallback
         allowed = allowed.filter(w => w <= width);
         if (allowed.length === 0) {
-            // Fallback if space is tiny. 
-            if (h === 4 && width < 2) allowed = [width];
-            else if (h === 2 && width < 4) allowed = [width];
+            allowed = [width]; // fallback: use whatever fits
         }
 
         const widths = partitionLine(width, allowed);
-
         let currentX = start;
         for (let w of widths) {
             rects.push({
@@ -142,7 +130,6 @@ function generateTiling(rows, cols) {
                 y: y,
                 w: w,
                 h: h,
-                // Assign a random color index/type for frontend styling
                 colorType: Math.floor(Math.random() * 6) // 0-5
             });
             currentX += w;
@@ -151,33 +138,16 @@ function generateTiling(rows, cols) {
 
     let currentRow = 0;
     while (currentRow < rows) {
-        // Determine strip height
+        const remaining = rows - currentRow;
         let h = 2;
+        // Randomly use h=4 strips when there's enough room
+        if (remaining >= 4 && Math.random() < 0.5) h = 4;
+        // Don't overshoot the board
+        if (currentRow + h > rows) h = remaining;
+        if (h <= 0) break;
 
-        // If we are approaching zoneY, don't overshoot.
-        if (currentRow < zoneY && currentRow + 4 <= zoneY && Math.random() < 0.5) h = 4;
-        else if (currentRow < zoneY && currentRow + 2 > zoneY) h = zoneY - currentRow; // Should be 2 or gap fill
-
-        // If inside zone vertical range
-        if (currentRow >= zoneY && currentRow < zoneY + zoneH) {
-            h = 2; // Keep it fine-grained inside zone rows
-            // Force alignment to zoneH ends
-            if (currentRow + h > zoneY + zoneH) h = zoneY + zoneH - currentRow;
-        } else if (currentRow >= zoneY + zoneH) {
-            // Below zone
-            if (rows - currentRow >= 4 && Math.random() < 0.5) h = 4;
-        }
-
-        // Generate Strips
-        if (currentRow >= zoneY && currentRow < zoneY + zoneH) {
-            // Split strip: Left of Zone, Right of Zone
-            fillStrip(currentRow, h, 0, zoneX);
-            fillStrip(currentRow, h, zoneX + zoneW, cols);
-        } else {
-            // Full strip
-            fillStrip(currentRow, h, 0, cols);
-        }
-
+        // Full-width strip — score zones cover the entire board
+        fillStrip(currentRow, h, 0, cols);
         currentRow += h;
     }
     return rects;

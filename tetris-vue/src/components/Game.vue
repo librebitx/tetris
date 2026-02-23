@@ -76,8 +76,8 @@
                {{ amIReady ? '已就绪 - 等待红方' : (isRedReady ? '红方已就绪 - 再来一局' : '再来一局') }}
           </button>
 
-          <!-- Review (multiplayer only) -->
-          <button v-if="!isSolo" class="secondary-btn" style="width: 100%; margin-top: 10px;" @click="toggleReview">对局复盘</button>
+          <!-- Review button (all modes) -->
+          <button class="secondary-btn" style="width: 100%; margin-top: 10px;" @click="toggleReview">对局复盘</button>
 
           <button class="leave-btn" style="margin-top: 10px;" @click="handleLeave">退出房间</button>
         </div>
@@ -102,18 +102,19 @@
           返回结算
       </button>
 
+      <!-- HUD: top-left overlay -->
       <div class="hud">
-        <div class="status-text">{{ statusText }}</div>
+        <div class="hud-status">{{ statusText }}</div>
+        <div class="hud-scores">
+          <span class="score-red">{{ isSolo ? '得分' : '红' }} {{ gameState.stats.redScore || 0 }}</span>
+          <template v-if="!isSolo">
+            <span class="score-divider">·</span>
+            <span class="score-blue">蓝 {{ gameState.stats.blueScore || 0 }}</span>
+          </template>
+        </div>
         <div class="territory-bar-container" v-if="!isSolo">
           <div class="bar red" :style="{ width: redPct + '%' }"></div>
           <div class="bar blue" :style="{ width: bluePct + '%' }"></div>
-        </div>
-        <div class="territory-text">
-          <span class="score-red">{{ isSolo ? '当前得分' : '红方' }} {{ gameState.stats.redScore || 0 }}</span>
-          <template v-if="!isSolo">
-            <span class="score-divider">·</span>
-            <span class="score-blue">蓝方 {{ gameState.stats.blueScore || 0 }}</span>
-          </template>
         </div>
       </div>
 
@@ -647,54 +648,55 @@ onUnmounted(() => {
   overflow: hidden;
 }
 
-/* HUD */
+/* HUD — top-left absolute overlay */
 .hud {
-  margin-bottom: 6px;
-  z-index: 10;
-  width: 100%;
-  text-align: center;
-  padding: 0 8px;
-  box-sizing: border-box;
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 200;
+  background: rgba(0, 0, 0, 0.72);
+  border: 3px solid #333;
+  padding: 6px 10px;
+  box-shadow: 3px 3px 0 #000;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  pointer-events: none;
+  min-width: 90px;
 }
 
-.status-text {
-  font-size: clamp(0.6em, 2vw, 0.9em);
-  font-weight: 600;
-  margin-bottom: 4px;
+.hud-status {
+  font-size: clamp(0.65em, 2.2vw, 0.9em);
+  font-weight: 700;
   color: #00ffff;
-  text-align: center;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   text-shadow: 1px 1px 0 #000;
+  white-space: nowrap;
+}
+
+.hud-scores {
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .territory-bar-container {
-  width: 90%;
-  max-width: 480px;
-  height: 12px;
+  width: 100%;
+  height: 8px;
   background: #111;
-  margin: 0 auto 6px;
   display: flex;
   border-radius: 0;
   overflow: hidden;
-  box-shadow: 4px 4px 0 #000;
-  border: 4px solid #444;
+  border: 2px solid #444;
 }
 .bar { height: 100%; transition: width 0.5s ease; }
 .red { background: #ff6b6b; }
 .blue { background: #4dabf7; }
 
-.territory-text {
-  font-size: clamp(0.6em, 2vw, 0.85em);
-  color: #b4b4b4;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 4px;
-}
-.score-red { color: #ff6b6b; font-size: 1.2em; font-weight: 800; text-shadow: 2px 2px 0 #000; }
-.score-blue { color: #4dabf7; font-size: 1.2em; font-weight: 800; text-shadow: 2px 2px 0 #000; }
-.score-divider { margin: 0 6px; color: #444; font-weight: bold; }
+.score-red { color: #ff6b6b; font-size: 1em; font-weight: 800; text-shadow: 1px 1px 0 #000; white-space: nowrap; }
+.score-blue { color: #4dabf7; font-size: 1em; font-weight: 800; text-shadow: 1px 1px 0 #000; white-space: nowrap; }
+.score-divider { margin: 0 3px; color: #444; font-weight: bold; }
 
 canvas {
   max-width: 96%;

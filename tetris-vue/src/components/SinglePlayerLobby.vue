@@ -86,15 +86,6 @@ const openLeaderboard = () => {
 };
 
 const handleStart = () => {
-  // Mobile/Web Fullscreen API Request
-  try {
-    if (document.documentElement.requestFullscreen) {
-      document.documentElement.requestFullscreen().catch((err) => {
-        console.warn('Fullscreen request failed:', err);
-      });
-    }
-  } catch(e) {}
-
   // 5 minutes = 300 seconds
   startGame({ mode: 'time', value: 300, speed: 1 });
 };
@@ -198,7 +189,7 @@ const viewBoard = (entry) => {
   padding: 16px 12px 40px;
   box-sizing: border-box;
   overflow-y: auto;
-  justify-content: flex-start;
+  justify-content: center;
   position: relative;
 }
 .lobby-container::before {
